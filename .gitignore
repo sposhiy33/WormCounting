@@ -2,4 +2,4 @@ dataroot/
 results/ 
 log/
 weights/
-__pycache__/
+**/__pycache__/
