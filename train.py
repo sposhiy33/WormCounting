@@ -57,7 +57,11 @@ def get_args_parser():
     parser.add_argument('--data_root', default='./new_public_density_data',
                         help='path where the dataset is')
     
-    parser.add_argument('--output_dir', default='./log',
+    parser.add_argument('--expname', type=str,
+                        help="""folder name under which model weights, tb logs,
+                              and any visualiztions will go in the ./results 
+                              folder""")
+    parser.add_argument('--output_dir', default='./results',
                         help='path where to save, empty for no saving')
     parser.add_argument('--checkpoints_dir', default='./ckpt',
                         help='path where to save checkpoints, empty for no saving')
@@ -76,10 +80,21 @@ def get_args_parser():
 
     return parser
 
+def make_dir(path:str):
+    if (os.path.exists(path) == False):
+        os.mkdir(path)
+
 def main(args):
     os.environ["CUDA_VISIBLE_DEVICES"] = '{}'.format(args.gpu_id)
-    # create the logging file
-    run_log_name = os.path.join(args.output_dir, 'run_log.txt')
+    # create folder for result saving
+    result_path = os.path.join(args.output_dir, args.expname)
+    make_dir(result_path)
+    tb_path = os.path.join(result_path, "logs")
+    weight_path = os.path.join(result_path, "weights")
+    make_dir(tb_path)
+    make_dir(weight_path)
+    # create the logging file    
+    run_log_name = os.path.join(result_path, 'run_log.txt')
     with open(run_log_name, "w") as log_file:
         log_file.write('Eval Log %s\n' % time.strftime("%c"))
 
@@ -151,7 +166,7 @@ def main(args):
     mae = []
     mse = []
     # the logger writer
-    writer = SummaryWriter(args.tensorboard_dir)
+    writer = SummaryWriter(tb_path)
     
     step = 0
     # training starts here
@@ -178,12 +193,12 @@ def main(args):
         # change lr according to the scheduler
         lr_scheduler.step()
         # save latest weights every epoch
-        checkpoint_latest_path = os.path.join(args.checkpoints_dir, 'latest.pth')
+        checkpoint_latest_path = os.path.join(weight_path, 'latest.pth')
         torch.save({
             'model': model_without_ddp.state_dict(),
         }, checkpoint_latest_path)
         # run evaluation
-        if epoch % args.eval_freq == 0 and epoch != 
+        if epoch % args.eval_freq == 0 and epoch != 0: 
             t1 = time.time()
             result = evaluate_crowd_no_overlap(model, data_loader_val, device)
             t2 = time.time()
@@ -208,7 +223,7 @@ def main(args):
 
             # save the best model since begining
             if abs(np.min(mae) - result[0]) < 0.01:
-                checkpoint_best_path = os.path.join(args.checkpoints_dir, 'best_mae.pth')
+                checkpoint_best_path = os.path.join(weight_path, 'best_mae.pth')
                 torch.save({
                     'model': model_without_ddp.state_dict(),
                 }, checkpoint_best_path)

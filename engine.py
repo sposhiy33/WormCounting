@@ -140,9 +140,9 @@ def evaluate_crowd_no_overlap(model, data_loader, device, vis_dir="./visres"):
 
         gt_cnt = targets[0]['point'].shape[0]
         # 0.5 is used by default
-        threshold = 0.01
+        threshold = 0.5
 
-        points = outputs_points[outputs_scores < threshold].detach().cpu().numpy().tolist()
+        points = outputs_points[outputs_scores > threshold].detach().cpu().numpy().tolist()
         predict_cnt = int((outputs_scores > threshold).sum())
         # if specified, save the visualized images
         predict_cnt
