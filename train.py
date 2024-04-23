@@ -93,6 +93,11 @@ def main(args):
     weight_path = os.path.join(result_path, "weights")
     make_dir(tb_path)
     make_dir(weight_path)
+    
+    # make an extra directory meant for visualizations
+    vis_path = os.path.join(result_path, "viz")
+    make_dir(viz_path)
+
     # create the logging file    
     run_log_name = os.path.join(result_path, 'run_log.txt')
     with open(run_log_name, "w") as log_file:

@@ -71,7 +71,8 @@ def main(args):
     data_loader_val = DataLoader(val_set, 1, sampler=sampler_val,
                                     drop_last=False, collate_fn=utils.collate_fn_crowd, num_workers=args.num_workers)
 
-    result = evaluate_crowd_no_overlap(model, data_loader_val, device)
+    result = evaluate_crowd_no_overlap(model, data_loader_val, device,
+                                       args.result_dir)
     
     print(result) 
 

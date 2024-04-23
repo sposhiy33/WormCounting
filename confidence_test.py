@@ -10,7 +10,7 @@ import numpy as np
 
 from PIL import Image
 import cv2
-rom crowd_datasets import build_dataset
+from crowd_datasets import build_dataset
 from engine import *
 from models import build_model
 import os
@@ -76,11 +76,16 @@ def main(args, debug=False):
     samples = samples.to(device)
     # run inference
     outputs = model(samples)
-    outputs_scores = torch.nn.functional.softmax(outputs['pred_logits'], -1)[:, :, 1][0]
-
+   
+    print(outputs['pred_logits'])
+    print(outputs['pred_logits'].size())
+    
+    outputs_scores = torch.nn.functional.softmax(outputs['pred_logits'], -1)[:,:,1][0]   
     outputs_points = outputs['pred_points'][0]
+    print('\nFinal')
     print(outputs_scores)
     print(torch.max(outputs_scores))
+    
     threshold = 0.5
     # filter the predictions
     points = outputs_points[outputs_scores > threshold].detach().cpu().numpy().tolist()
@@ -89,7 +94,7 @@ def main(args, debug=False):
 
     outputs_points = outputs['pred_points'][0]
     # draw the predictions
-    size = 2
+    size = 5
     img_to_draw = cv2.cvtColor(np.array(img_raw), cv2.COLOR_RGB2BGR)
     for p in points:
         img_to_draw = cv2.circle(img_to_draw, (int(p[0]), int(p[1])), size, (0, 0, 255), -1)
