@@ -50,7 +50,7 @@ def vis(samples, targets, pred, vis_dir, des=None):
 
         max_len = np.max(sample_gt.shape)
 
-        size = 2
+        size = 6
         # draw gt
         for t in gts[idx]:
             sample_gt = cv2.circle(sample_gt, (int(t[0]), int(t[1])), size, (0, 255, 0), -1)
@@ -144,7 +144,6 @@ def evaluate_crowd_no_overlap(model, data_loader, device, vis_dir="./visres"):
 
         points = outputs_points[outputs_scores > threshold].detach().cpu().numpy().tolist()
         predict_cnt = int((outputs_scores > threshold).sum())
-        print(predict_cnt)
         # if specified, save the visualized images
         if vis_dir is not None: 
             vis(samples, targets, [points], vis_dir)

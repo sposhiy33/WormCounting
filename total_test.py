@@ -1,3 +1,7 @@
+"""
+This script does standalone validation using pre-trained model weights.
+"""
+
 import argparse
 import datetime
 import random

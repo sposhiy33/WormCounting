@@ -63,10 +63,6 @@ def get_args_parser():
                               folder""")
     parser.add_argument('--output_dir', default='./results',
                         help='path where to save, empty for no saving')
-    parser.add_argument('--checkpoints_dir', default='./ckpt',
-                        help='path where to save checkpoints, empty for no saving')
-    parser.add_argument('--tensorboard_dir', default='./runs',
-                        help='path where to save, empty for no saving')
 
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--resume', default='', help='resume from checkpoint')
@@ -96,7 +92,7 @@ def main(args):
     
     # make an extra directory meant for visualizations
     vis_path = os.path.join(result_path, "viz")
-    make_dir(viz_path)
+    make_dir(vis_path)
 
     # create the logging file    
     run_log_name = os.path.join(result_path, 'run_log.txt')

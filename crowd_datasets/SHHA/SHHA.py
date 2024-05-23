@@ -14,8 +14,8 @@ class SHHA(Dataset):
         
         self.train_lists = "shtrain.list"
         self.eval_list = "shtest.list"
-        # self.train_lists = "shanghai_tech_part_a_train.list"
-        #self.eval_list = "shanghai_tech_part_a_test.list"
+  
+
         # there may exist multiple list files
         self.img_list_file = self.train_lists.split(',')
         if train:
