@@ -2,4 +2,5 @@ dataroot/
 results/ 
 log/
 weights/
+pretrained/
 **/__pycache__/
