@@ -13,8 +13,8 @@ class WORM(Dataset):
                             scale=False, patch=False, flip=False):
         self.root_path = data_root
 
-        self.train_lists = "shtrain.list"
-        self.eval_list = "shtest.list"
+        self.train_lists = "wtrain.txt"
+        self.eval_list = "wtest.txt"
   
 
         # there may exist multiple list files
@@ -85,8 +85,6 @@ class WORM(Dataset):
 
         if not self.train:
             point = [point]
-        
-        print(len(point))
 
         img = torch.Tensor(img)
         # pack up related infos
@@ -109,18 +107,21 @@ def load_data(img_gt_path, train):
     # load ground truth points
     points = []
     with open(gt_path) as f_label:
+        # for line in f_label:
+            # x = float(line.strip().split(' ')[0].replace(",", ""))
+            # y = float(line.strip().split(' ')[1])
+            # points.append([x, y])
         for line in f_label:
-            x = float(line.strip().split(' ')[0].replace(",", ""))
-            y = float(line.strip().split(' ')[1])
-            points.append([x, y])
-
+            x = float(line.strip().split("\t")[0].strip()) 
+            y = float(line.strip().split("\t")[1].strip())
+            points.append([x,y])
     return img, np.array(points)
 
 # random crop augumentation
 def random_crop(img, den, num_patch=4):
 
-    half_h = 200
-    half_w = 200
+    half_h = img.size()[1]//4
+    half_w = img.size()[2]//4
     result_img = np.zeros([num_patch, img.shape[0], half_h, half_w])
     result_den = []
     # crop num_patch for each image
