@@ -195,7 +195,7 @@ class P2PNet(nn.Module):
     def __init__(self, backbone, row=2, line=2):
         super().__init__()
         self.backbone = backbone
-        self.num_classes = 2
+        self.num_classes = 3
         # the number of all anchor points
         num_anchor_points = row * line
 
@@ -255,7 +255,6 @@ class SetCriterion_Crowd(nn.Module):
         src_logits = outputs['pred_logits']
 
         idx = self._get_src_permutation_idx(indices)
-        print(idx)
         target_classes_o = torch.cat([t["labels"][J] for t, (_, J) in zip(targets, indices)])
         target_classes = torch.full(src_logits.shape[:2], 0,
                                     dtype=torch.int64, device=src_logits.device)
@@ -327,7 +326,7 @@ class SetCriterion_Crowd(nn.Module):
 # create the P2PNet model
 def build(args, training):
     # treats persons as a single class
-    num_classes = 1
+    num_classes = 2
 
     backbone = build_backbone(args)
     model = P2PNet(backbone, args.row, args.line)
