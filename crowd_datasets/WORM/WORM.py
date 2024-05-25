@@ -13,9 +13,15 @@ class WORM(Dataset):
                             scale=False, patch=False, flip=False):
         self.root_path = data_root
 
-        self.train_lists = "wtrain.txt"
-        self.eval_list = "wtest.txt"
-  
+        if "uncompressed_worm" in self.root_path:
+            self.train_lists = "wtrain.txt"
+            self.eval_list = "wtest.txt"
+        elif "worm_dataset" in self.root_path:
+            self.train_lists = "shtrain.list"
+            self.eval_list = "shtest.list"
+        elif "multiclass_worm" in self.root_path:
+            self.train_lists = "mtrain.txt"
+            self.eval_list = "mtest.txt"
 
         # there may exist multiple list files
         self.img_list_file = self.train_lists.split(',')
@@ -55,8 +61,7 @@ class WORM(Dataset):
         img_path = self.img_list[index]
         gt_path = self.img_map[img_path]
         # load image and ground truth
-        img, point = load_data((img_path, gt_path), self.train)
-
+        img, point, label_class = load_data((img_path, gt_path), self.train)
         # apply augumentation
         if self.transform is not None:
             img = self.transform(img)
@@ -94,8 +99,19 @@ class WORM(Dataset):
             image_id = int(img_path.split('/')[-1].split('.')[0].split('_')[-1])
             image_id = torch.Tensor([image_id]).long()
             target[i]['image_id'] = image_id
-            target[i]['labels'] = torch.ones([point[i].shape[0]]).long()
+            
+            if label_class is not None:
+                labels = torch.zeros([point[i].shape[0]]).long() 
+                for l in range(labels.size()[0]): 
+                    if label_class == "L1":
+                        labels[l] = 1
+                    elif label_class == "ADT":
+                        labels[l] = 2
+            else:
+                labels = torch.ones([point[i].shape[0]]).long()       
 
+            target[i]['labels'] = labels
+        
         return img, target
 
 
@@ -105,23 +121,35 @@ def load_data(img_gt_path, train):
     img = cv2.imread(img_path)
     img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
     # load ground truth points
-    points = []
+    points = []  
+
+    # assign a class
+    label_class = None
+    if "L1" in img_path:
+        label_class = "L1"
+    elif "ADT" in img_path:
+        label_class = "ADT"
+
     with open(gt_path) as f_label:
-        # for line in f_label:
-            # x = float(line.strip().split(' ')[0].replace(",", ""))
-            # y = float(line.strip().split(' ')[1])
-            # points.append([x, y])
         for line in f_label:
-            x = float(line.strip().split("\t")[0].strip()) 
-            y = float(line.strip().split("\t")[1].strip())
-            points.append([x,y])
-    return img, np.array(points)
+            if "\t" in line:
+                x = float(line.strip().split("\t")[0].strip()) 
+                y = float(line.strip().split("\t")[1].strip())
+                points.append([x,y])
+            else:
+                x = float(line.strip().split(' ')[0].replace(",", ""))
+                y = float(line.strip().split(' ')[1])
+                points.append([x, y])
+        
+    return img, np.array(points), label_class
 
 # random crop augumentation
 def random_crop(img, den, num_patch=4):
 
-    half_h = img.size()[1]//4
-    half_w = img.size()[2]//4
+    half_h = 128
+    half_w = 128
+    # half_h = img.size()[1]//4
+    # half_w = img.size()[2]//4
     result_img = np.zeros([num_patch, img.shape[0], half_h, half_w])
     result_den = []
     # crop num_patch for each image
