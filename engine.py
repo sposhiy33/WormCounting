@@ -144,6 +144,7 @@ def evaluate_crowd_no_overlap(model, data_loader, device, vis_dir="./visres"):
 
         points = outputs_points[outputs_scores > threshold].detach().cpu().numpy().tolist()
         predict_cnt = int((outputs_scores > threshold).sum())
+        
         # if specified, save the visualized images
         if vis_dir is not None: 
             vis(samples, targets, [points], vis_dir)

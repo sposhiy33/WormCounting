@@ -30,7 +30,7 @@ def get_arg_parser():
     parser.add_argument('--line', default=2, type=int,
                         help="line number of anchor points")
 
-    parser.add_argument("--data_root", type=str)
+    parser.add_argument("--dataroot", type=str)
     parser.add_argument("--dataset_file", default="SHHA")
 
     ## throwaway args
@@ -56,12 +56,15 @@ def main(args):
         standard_transforms.ToTensor(), 
         standard_transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
-    
+
     ### BUILD DATASET ###
     # create the dataset
-    loading_data = build_dataset(args=args)
+    loading_data = build_dataset(args)
+    
+    print(args)
+
     # create the training and valiation set
-    train_set, val_set = loading_data(args.data_root)
+    train_set, val_set = loading_data(args.dataroot)
     # create the sampler used during training
     sampler_train = torch.utils.data.RandomSampler(train_set)
     sampler_val = torch.utils.data.SequentialSampler(val_set)
@@ -83,6 +86,6 @@ def main(args):
 
 if __name__ == "__main__":
     parser = get_arg_parser()
-    args = parser.parse_args()
-    main(args)
+    arg = parser.parse_args()
+    main(arg)
 

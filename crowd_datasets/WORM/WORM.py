@@ -99,7 +99,8 @@ class WORM(Dataset):
             image_id = int(img_path.split('/')[-1].split('.')[0].split('_')[-1])
             image_id = torch.Tensor([image_id]).long()
             target[i]['image_id'] = image_id
-            
+           
+            # for multiclass classification, assign labels 
             if label_class is not None:
                 labels = torch.zeros([point[i].shape[0]]).long() 
                 for l in range(labels.size()[0]): 
@@ -144,29 +145,33 @@ def load_data(img_gt_path, train):
     return img, np.array(points), label_class
 
 # random crop augumentation
-def random_crop(img, den, num_patch=4):
+def random_crop(img, den, num_patch=8):
 
-    half_h = 128
-    half_w = 128
+    half_h = 512
+    half_w = 512
     # half_h = img.size()[1]//4
     # half_w = img.size()[2]//4
     result_img = np.zeros([num_patch, img.shape[0], half_h, half_w])
     result_den = []
     # crop num_patch for each image
-    for i in range(num_patch):
+    # keep sampling patches until all have non-zero number of samples in them (hence the while loop)
+    current_count = 0
+    while current_count < num_patch:
         start_h = random.randint(0, img.size(1) - half_h)
         start_w = random.randint(0, img.size(2) - half_w)
         end_h = start_h + half_h
         end_w = start_w + half_w
-        # copy the cropped rect
-        result_img[i] = img[:, start_h:end_h, start_w:end_w]
         # copy the cropped points
         idx = (den[:, 0] >= start_w) & (den[:, 0] <= end_w) & (den[:, 1] >= start_h) & (den[:, 1] <= end_h)
         # shift the corrdinates
         record_den = den[idx]
-        record_den[:, 0] -= start_w
-        record_den[:, 1] -= start_h
 
-        result_den.append(record_den)
+        if len(record_den) > 0:
+            # copy the cropped rect
+            result_img[current_count] = img[:, start_h:end_h, start_w:end_w]
+            record_den[:, 0] -= start_w
+            record_den[:, 1] -= start_h
+            result_den.append(record_den)
+            current_count += 1 
 
     return result_img, result_den

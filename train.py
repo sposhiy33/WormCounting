@@ -34,6 +34,8 @@ def get_args_parser():
     # * Backbone
     parser.add_argument('--backbone', default='vgg16_bn', type=str,
                         help="Name of the convolutional backbone to use")
+    parser.add_argument('--num_classes', default=1, type=int,
+                        help="number of non NONE type classes")
 
     # * Matcher
     parser.add_argument('--set_cost_class', default=1, type=float,

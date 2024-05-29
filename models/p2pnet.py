@@ -192,10 +192,11 @@ class Decoder(nn.Module):
 
 # the defenition of the P2PNet model
 class P2PNet(nn.Module):
-    def __init__(self, backbone, row=2, line=2):
+    def __init__(self, backbone, num_classes, row=2, line=2):
         super().__init__()
         self.backbone = backbone
-        self.num_classes = 3
+        # number of classes in each logit, add one for no-person class.
+        self.num_classes = num_classes + 1
         # the number of all anchor points
         num_anchor_points = row * line
 
@@ -263,7 +264,7 @@ class SetCriterion_Crowd(nn.Module):
 
         loss_ce = F.cross_entropy(src_logits.transpose(1, 2), target_classes, self.empty_weight)
         losses = {'loss_ce': loss_ce}
-
+        
         return losses
 
     def loss_points(self, outputs, targets, indices, num_points):
@@ -272,7 +273,6 @@ class SetCriterion_Crowd(nn.Module):
         idx = self._get_src_permutation_idx(indices)
         src_points = outputs['pred_points'][idx]
         target_points = torch.cat([t['point'][i] for t, (_, i) in zip(targets, indices)], dim=0)
-
         loss_bbox = F.mse_loss(src_points, target_points, reduction='none')
 
         losses = {}
@@ -326,17 +326,16 @@ class SetCriterion_Crowd(nn.Module):
 # create the P2PNet model
 def build(args, training):
     # treats persons as a single class
-    num_classes = 2
 
     backbone = build_backbone(args)
-    model = P2PNet(backbone, args.row, args.line)
+    model = P2PNet(backbone, args.num_classes, args.row, args.line)
     if not training: 
         return model
 
     weight_dict = {'loss_ce': 1, 'loss_points': args.point_loss_coef}
     losses = ['labels', 'points']
     matcher = build_matcher_crowd(args)
-    criterion = SetCriterion_Crowd(num_classes, \
+    criterion = SetCriterion_Crowd(args.num_classes, \
                                 matcher=matcher, weight_dict=weight_dict, \
                                 eos_coef=args.eos_coef, losses=losses)
 
