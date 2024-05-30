@@ -13,14 +13,11 @@ class WORM(Dataset):
     def __init__(self, data_root, transform=None, train=False, 
                             scale=False, rotate=False, patch=False, flip=False):
         self.root_path = data_root
-
-        if "uncompressed_worm" in self.root_path:
-            self.train_lists = "wtrain.txt"
-            self.eval_list = "wtest.txt"
-        elif "worm_dataset" in self.root_path:
+        
+        if "worm_dataset" in self.root_path:
             self.train_lists = "shtrain.list"
             self.eval_list = "shtest.list"
-        elif "multiclass_worm" in self.root_path:
+        else:
             self.train_lists = "mtrain.txt"
             self.eval_list = "mtest.txt"
 
@@ -89,11 +86,10 @@ class WORM(Dataset):
             # apply rotation transformation for data balacing
             if self.rotate: 
                 patch_expansion = 2
-                if label_class == "L1": patch_expansion=2
+                if label_class == "L1": patch_expansion=1
                 elif label_class == "ADT": patch_expansion=4
                 img, point = random_rotate(img, point, patch_expansion)
-                for p in point:
-                    print(p.size())
+        
         # random flipping
         if random.random() > 0.5 and self.train and self.flip:
             # random flip
@@ -163,6 +159,7 @@ def random_rotate(img, den, num_examples):
     result_img = np.zeros([num_examples*len(img), img[0].shape[0], img[0].shape[1], img[0].shape[2]])
     result_den = []
 
+    # rotate each patch, num_examples number of times (along with corresponding points)
     for i,patch in enumerate(img):
         for j in range(num_examples): 
             ang = random.randrange(1,360)
@@ -175,10 +172,10 @@ def random_rotate(img, den, num_examples):
     return result_img, result_den
              
 # random crop augumentation
-def random_crop(img, den, num_patch=8):
+def random_crop(img, den, num_patch=4):
 
-    half_h = 512
-    half_w = 512
+    half_h = 128
+    half_w = 128
     # half_h = img.size()[1]//4
     # half_w = img.size()[2]//4
     result_img = np.zeros([num_patch, img.shape[0], half_h, half_w])
