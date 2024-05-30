@@ -3,6 +3,7 @@ import random
 import torch
 import numpy as np
 from torch.utils.data import Dataset
+import torchvision
 from PIL import Image
 import cv2
 import glob
@@ -10,7 +11,7 @@ import scipy.io as io
 
 class WORM(Dataset):
     def __init__(self, data_root, transform=None, train=False, 
-                            scale=False, patch=False, flip=False):
+                            scale=False, rotate=False, patch=False, flip=False):
         self.root_path = data_root
 
         if "uncompressed_worm" in self.root_path:
@@ -47,11 +48,12 @@ class WORM(Dataset):
         self.nSamples = len(self.img_list)
         
         self.transform = transform
+        self.rotate = rotate
         self.train = train
         self.patch = patch
         self.scale = scale
         self.flip = flip
-
+        
     def __len__(self):
         return self.nSamples
 
@@ -79,8 +81,19 @@ class WORM(Dataset):
         # random crop augumentaiton
         if self.train and self.patch:
             img, point = random_crop(img, point)
+
+            # convert point arrays for each image to torch Tensor type
             for i, _ in enumerate(point):
                 point[i] = torch.Tensor(point[i])
+
+            # apply rotation transformation for data balacing
+            if self.rotate: 
+                patch_expansion = 2
+                if label_class == "L1": patch_expansion=2
+                elif label_class == "ADT": patch_expansion=4
+                img, point = random_rotate(img, point, patch_expansion)
+                for p in point:
+                    print(p.size())
         # random flipping
         if random.random() > 0.5 and self.train and self.flip:
             # random flip
@@ -144,6 +157,23 @@ def load_data(img_gt_path, train):
         
     return img, np.array(points), label_class
 
+def random_rotate(img, den, num_examples):
+    
+    # takes n patches and creates n*num_examples from each
+    result_img = np.zeros([num_examples*len(img), img[0].shape[0], img[0].shape[1], img[0].shape[2]])
+    result_den = []
+
+    for i,patch in enumerate(img):
+        for j in range(num_examples): 
+            ang = random.randrange(1,360)
+            rot_img = torchvision.transforms.functional.rotate(torch.Tensor(patch), ang)
+            rot_den = torchvision.transforms.functional.rotate(torch.unsqueeze(den[i],0), ang)
+            
+            result_img[(i*num_examples) + j] = rot_img
+            result_den.append(torch.squeeze(rot_den, 0))
+
+    return result_img, result_den
+             
 # random crop augumentation
 def random_crop(img, den, num_patch=8):
 
