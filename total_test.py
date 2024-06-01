@@ -29,7 +29,8 @@ def get_arg_parser():
                         help="row number of anchor points")
     parser.add_argument('--line', default=2, type=int,
                         help="line number of anchor points")
-
+    parser.add_argument("--num_classes", type=int, default=1,
+                        help="number of non no-person classes")
     parser.add_argument("--dataroot", type=str)
     parser.add_argument("--dataset_file", default="SHHA")
 

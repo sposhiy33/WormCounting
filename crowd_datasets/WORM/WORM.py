@@ -87,7 +87,7 @@ class WORM(Dataset):
             if self.rotate: 
                 patch_expansion = 2
                 if label_class == "L1": patch_expansion=1
-                elif label_class == "ADT": patch_expansion=4
+                elif label_class == "ADT": patch_expansion=8
                 img, point = random_rotate(img, point, patch_expansion)
         
         # random flipping
@@ -174,10 +174,8 @@ def random_rotate(img, den, num_examples):
 # random crop augumentation
 def random_crop(img, den, num_patch=4):
 
-    half_h = 128
-    half_w = 128
-    # half_h = img.size()[1]//4
-    # half_w = img.size()[2]//4
+    half_h = img.size()[1]//4
+    half_w = img.size()[2]//4
     result_img = np.zeros([num_patch, img.shape[0], half_h, half_w])
     result_den = []
     # crop num_patch for each image
