@@ -5,3 +5,4 @@ weights/
 pretrained/
 **/__pycache__/
 nohup.out
+.nohup.out.swp
