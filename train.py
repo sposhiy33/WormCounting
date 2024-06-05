@@ -207,7 +207,7 @@ def main(args):
         }, checkpoint_latest_path)
 
         # run classwise loss evaluation
-        avg_class = avg_class_loss(class_stat, writer)
+        avg_class = avg_class_loss(class_stat, writer, epoch)
         print(f"Avg Classwise loss:     loss_ce: {avg_class[0]}     loss_point: {avg_class[1]}")
 
         # run evaluation
@@ -246,7 +246,7 @@ def main(args):
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
     print('Training time {}'.format(total_time_str))
 
-def avg_class_loss(loss, writer):
+def avg_class_loss(loss, writer, epoch):
     ce_losses = []
     point_losses = []
     for entry in loss:
@@ -266,9 +266,9 @@ def avg_class_loss(loss, writer):
     point_mean = numpy.nanmean(point_losses, axis=1)
 
     for i, mean in enumerate(ce_mean):
-        writer.add_scalar(f"metric/class{i}_loss_ce", mean)
+        writer.add_scalar(f"metric/class{i}_loss_ce", mean, epoch)
     for i, mena in enumerate(point_mean):
-        writer.add_scalar(f"metric/class{i}_loss_point", mean)
+        writer.add_scalar(f"metric/class{i}_loss_point", mean, epoch)
 
     return ce_mean, point_mean
 
