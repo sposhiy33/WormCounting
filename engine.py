@@ -81,6 +81,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     criterion.train()
     metric_logger = utils.MetricLogger(delimiter="  ")
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value:.6f}'))
+    classwise_loss_total_epoch = []
+    
     # iterate all training samples
     for samples, targets in data_loader:
         samples = samples.to(device)
@@ -88,7 +90,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         # forward
         outputs = model(samples)
         # calc the losses
-        loss_dict = criterion(outputs, targets)
+        loss_dict, classwise_loss_dict = criterion(outputs, targets)
+        classwise_loss_total_epoch.append(classwise_loss_dict)
         weight_dict = criterion.weight_dict
         losses = sum(loss_dict[k] * weight_dict[k] for k in loss_dict.keys() if k in weight_dict)
 
@@ -118,7 +121,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
     print("Averaged stats:", metric_logger)
-    return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
+    return {k: meter.global_avg for k, meter in metric_logger.meters.items()}, classwise_loss_total_epoch
 
 # the inference routine
 @torch.no_grad()

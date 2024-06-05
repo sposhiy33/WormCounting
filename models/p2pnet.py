@@ -247,7 +247,7 @@ class SetCriterion_Crowd(nn.Module):
         empty_weight = torch.ones(self.num_classes + 1)
         empty_weight[0] = self.eos_coef
         self.register_buffer('empty_weight', empty_weight)
-
+            
     def loss_labels(self, outputs, targets, indices, num_points):
         """Classification loss (NLL)
         targets dicts must contain the key "labels" containing a tensor of dim [nb_target_boxes]
@@ -261,24 +261,50 @@ class SetCriterion_Crowd(nn.Module):
                                     dtype=torch.int64, device=src_logits.device)
 
         target_classes[idx] = target_classes_o
+       
+        ## classwise loss for debugging
+        classwise_loss_ce = []
+        for i in range(self.num_classes+1):
+            weight = torch.zeros(self.num_classes + 1, device=src_logits.device)
+            weight[i] = 1
+            lce = F.cross_entropy(src_logits.transpose(1,2), target_classes, weight)
+            classwise_loss_ce.append(lce)
 
         loss_ce = F.cross_entropy(src_logits.transpose(1, 2), target_classes, self.empty_weight)
-        losses = {'loss_ce': loss_ce}
-        
-        return losses
 
+        losses = {'loss_ce': loss_ce}
+        class_losses = {"class_loss_ce": classwise_loss_ce}
+        
+        return losses, class_losses
+
+        
     def loss_points(self, outputs, targets, indices, num_points):
 
         assert 'pred_points' in outputs
         idx = self._get_src_permutation_idx(indices)
         src_points = outputs['pred_points'][idx]
         target_points = torch.cat([t['point'][i] for t, (_, i) in zip(targets, indices)], dim=0)
+        
+        # point labels
+        target_classes = torch.cat([t["labels"][J] for t, (_, J) in zip(targets, indices)])
+        
         loss_bbox = F.mse_loss(src_points, target_points, reduction='none')
+        
+        # split points by class label, and recalculate mse by the specific class
+        class_mse = []
+        for i in range(self.num_classes):
+            mask = (target_classes == i + 1).nonzero(as_tuple=True) 
+            src_point_mask = src_points[mask]
+            target_point_mask = target_points[mask]
+            eucdist = F.mse_loss(src_point_mask, target_point_mask, reduction="none")
+            loss_avg = eucdist.sum() / int(mask[0].size()[0])
+            class_mse.append(loss_avg)
 
+        class_losses = {"class_loss_point": class_mse}    
         losses = {}
         losses['loss_point'] = loss_bbox.sum() / num_points
 
-        return losses
+        return losses, class_losses
 
     def _get_src_permutation_idx(self, indices):
         # permute predictions following indices
@@ -318,10 +344,13 @@ class SetCriterion_Crowd(nn.Module):
         num_boxes = torch.clamp(num_points / get_world_size(), min=1).item()
 
         losses = {}
+        classwise_losses = {}
         for loss in self.losses:
-            losses.update(self.get_loss(loss, output1, targets, indices1, num_boxes))
-
-        return losses
+            main, classwise = self.get_loss(loss, output1, targets, indices1, num_boxes)
+            losses.update(main)
+            classwise_losses.update(classwise)
+        
+        return losses, classwise_losses
 
 # create the P2PNet model
 def build(args, training):

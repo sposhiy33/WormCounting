@@ -3,6 +3,7 @@ import datetime
 import random
 import time
 from pathlib import Path
+import numpy
 
 import torch
 from torch.utils.data import DataLoader, DistributedSampler
@@ -180,7 +181,7 @@ def main(args):
     # training starts here
     for epoch in range(args.start_epoch, args.epochs):
         t1 = time.time()
-        stat = train_one_epoch(
+        stat, class_stat = train_one_epoch(
             model, criterion, data_loader_train, optimizer, device, epoch,
             args.clip_max_norm)
 
@@ -192,7 +193,6 @@ def main(args):
                 
             writer.add_scalar('loss/loss', stat['loss'], epoch)
             writer.add_scalar('loss/loss_ce', stat['loss_ce'], epoch)
-
         t2 = time.time()
         print('[ep %d][lr %.7f][%.2fs]' % \
               (epoch, optimizer.param_groups[0]['lr'], t2 - t1))
@@ -205,11 +205,17 @@ def main(args):
         torch.save({
             'model': model_without_ddp.state_dict(),
         }, checkpoint_latest_path)
+
+        # run classwise loss evaluation
+        avg_class = avg_class_loss(class_stat, writer)
+        print(f"Avg Classwise loss:     loss_ce: {avg_class[0]}     loss_point: {avg_class[1]}")
+
         # run evaluation
         if epoch % args.eval_freq == 0 and epoch != 0: 
             t1 = time.time()
             result = evaluate_crowd_no_overlap(model, data_loader_val, device)
             t2 = time.time()
+
 
             mae.append(result[0])
             mse.append(result[1])
@@ -239,6 +245,32 @@ def main(args):
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
     print('Training time {}'.format(total_time_str))
+
+def avg_class_loss(loss, writer):
+    ce_losses = []
+    point_losses = []
+    for entry in loss:
+        # calculate avg ce loss
+        ce_list = entry['class_loss_ce']
+        ce_list  = [i.item() for i in ce_list]
+        ce_losses.append(ce_list)
+    
+        # calculate point losses
+        point_list = entry["class_loss_point"]
+        point_list = [i.item() for i in point_list]
+        point_losses.append(point_list)
+
+    ce_losses, point_losses = numpy.array(ce_losses), numpy.array(point_losses)
+    ce_losses, point_losses = ce_losses.transpose(), point_losses.transpose()
+    ce_mean = numpy.nanmean(ce_losses, axis=1)
+    point_mean = numpy.nanmean(point_losses, axis=1)
+
+    for i, mean in enumerate(ce_mean):
+        writer.add_scalar(f"metric/class{i}_loss_ce", mean)
+    for i, mena in enumerate(point_mean):
+        writer.add_scalar(f"metric/class{i}_loss_point", mean)
+
+    return ce_mean, point_mean
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('P2PNet training and evaluation script', parents=[get_args_parser()])
