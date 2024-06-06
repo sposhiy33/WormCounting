@@ -11,7 +11,7 @@ import scipy.io as io
 
 class WORM(Dataset):
     def __init__(self, data_root, transform=None, train=False, 
-                            scale=False, rotate=False, patch=False, flip=False):
+                            scale=False, rotate=False, patch=False, flip=False, multiclass=False):
         self.root_path = data_root
         
         if "worm_dataset" in self.root_path:
@@ -50,6 +50,7 @@ class WORM(Dataset):
         self.patch = patch
         self.scale = scale
         self.flip = flip
+        self.multiclass = multiclass
         
     def __len__(self):
         return self.nSamples
@@ -60,7 +61,7 @@ class WORM(Dataset):
         img_path = self.img_list[index]
         gt_path = self.img_map[img_path]
         # load image and ground truth
-        img, point, label_class = load_data((img_path, gt_path), self.train)
+        img, point, label_class = load_data((img_path, gt_path), self.train, self.multiclass)
         # apply augumentation
         if self.transform is not None:
             img = self.transform(img)
@@ -125,7 +126,7 @@ class WORM(Dataset):
         return img, target
 
 
-def load_data(img_gt_path, train):
+def load_data(img_gt_path, train, multiclass):
     img_path, gt_path = img_gt_path
     # load the images
     img = cv2.imread(img_path)
@@ -135,10 +136,12 @@ def load_data(img_gt_path, train):
 
     # assign a class
     label_class = None
-    if "L1" in img_path:
-        label_class = "L1"
-    elif "ADT" in img_path:
-        label_class = "ADT"
+    
+    if multiclass:
+        if "L1" in img_path:
+            label_class = "L1"
+        elif "ADT" in img_path:
+            label_class = "ADT"
 
     with open(gt_path) as f_label:
         for line in f_label:
