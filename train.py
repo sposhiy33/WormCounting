@@ -264,10 +264,11 @@ def avg_class_loss(loss, writer, epoch):
     ce_losses, point_losses = ce_losses.transpose(), point_losses.transpose()
     ce_mean = numpy.nanmean(ce_losses, axis=1)
     point_mean = numpy.nanmean(point_losses, axis=1)
+    ce_mean, point_mean = ce_mean.tolist(), point_mean.tolist()
 
     for i, mean in enumerate(ce_mean):
         writer.add_scalar(f"metric/class{i}_loss_ce", mean, epoch)
-    for i, mena in enumerate(point_mean):
+    for i, mean in enumerate(point_mean):
         writer.add_scalar(f"metric/class{i}_loss_point", mean, epoch)
 
     return ce_mean, point_mean
