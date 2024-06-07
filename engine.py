@@ -73,6 +73,38 @@ def vis(samples, targets, pred, vis_dir, des=None):
                 os.path.join(vis_dir, '{}_gt_{}_pred_{}_pred.jpg'.format(int(name), len(gts[idx]), len(pred[idx]))),
                 sample_pred)
 
+
+# the training routine for point proposal classification
+def train_one_epoch_classifier(regr_model: torch.nn.Module,
+                               model: torch.nn.Module, criterion: torch.nn.Module,
+                               data_loader, optimizer, device, epoch, max_norm:float=0):
+    regr_model.eval()
+    model.train()
+    criterion.train()
+
+    for samples, targets in data_loader:
+        samples = samples.to(device)
+        targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
+        # get point proposals
+        regr_points = regr_model(samples)
+        outputs = model(samples)
+        loss_dict = criterion(outputs, regr_outputs, targets)
+
+        if not math.isfinite(loss_value):
+            print("Loss is {}, stopping training".format(loss_value))
+            print(loss_dict_reduced)
+            sys.exit(1)
+        
+        losses = sum(loss_dict[k] for k in loss_dict.keys())
+        loss_val = losses.item()
+        
+        # backward
+        optimizer.zero_grad()
+        losses.backward()
+        if max_norm > 0:
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
+        optimizer.step()
+ 
 # the training routine
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,

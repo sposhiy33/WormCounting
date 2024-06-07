@@ -86,7 +86,7 @@ class WORM(Dataset):
 
             # apply rotation transformation for data balacing
             if self.rotate: 
-                patch_expansion = 2
+                patch_expansion = 1
                 if label_class == "L1": patch_expansion=1
                 elif label_class == "ADT": patch_expansion=8
                 img, point = random_rotate(img, point, patch_expansion)
@@ -115,9 +115,9 @@ class WORM(Dataset):
                 labels = torch.zeros([point[i].shape[0]]).long() 
                 for l in range(labels.size()[0]): 
                     if label_class == "L1":
-                        labels[l] = 1
+                        labels[l] = 0
                     elif label_class == "ADT":
-                        labels[l] = 2
+                        labels[l] = 1
             else:
                 labels = torch.ones([point[i].shape[0]]).long()       
 
@@ -161,15 +161,21 @@ def random_rotate(img, den, num_examples):
     result_img = np.zeros([num_examples*len(img), img[0].shape[0], img[0].shape[1], img[0].shape[2]])
     result_den = []
 
+
     # rotate each patch, num_examples number of times (along with corresponding points)
     for i,patch in enumerate(img):
         for j in range(num_examples): 
-            ang = random.randrange(1,360)
-            rot_img = torchvision.transforms.functional.rotate(torch.Tensor(patch), ang)
-            rot_den = torchvision.transforms.functional.rotate(torch.unsqueeze(den[i],0), ang)
+            theta = random.randrange(1,360)
+            # create rotation matrix
+            sin = torch.sin(torch.Tensor([theta])).item()
+            cos = torch.cos(torch.Tensor([theta])).item()
+            rot_matrix = torch.Tensor([[cos, -sin],[sin, cos]])
             
+            rot_img = torchvision.transforms.functional.rotate(torch.Tensor(patch), theta)
+            rot_den = torch.matmul(den[i], rot_matrix)
+            print(rot_den.size()) 
             result_img[(i*num_examples) + j] = rot_img
-            result_den.append(torch.squeeze(rot_den, 0))
+            result_den.append(rot_den)
 
     return result_img, result_den
              

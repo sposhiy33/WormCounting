@@ -16,3 +16,17 @@ def loading_data(data_root, multiclass=False):
     val_set = WORM(data_root, train=False, transform=transform, multiclass=multiclass)
 
     return train_set, val_set
+
+def load_viz_data(data_root, multiclass=False):
+
+    # transform to tensor
+    transform = standard_transforms.ToTensor()
+
+    train_set = WORM(data_root, train=True, transform=transform, patch=True, rotate=True, scale=True, flip=False, multiclass=multiclass)
+    val_set = WORM(data_root, train=False, transform=transform, multiclass=multiclass)
+
+    return train_set, val_set
+
+
+
+

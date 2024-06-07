@@ -227,6 +227,90 @@ class P2PNet(nn.Module):
        
         return out
 
+class FineClassifier(nn.Module):
+    """ Create fine grained classifier for p2p net point proposals
+
+    """
+
+    def __init__(self, backbone, num_classes, row=2, line=2):
+        super().__init__()
+
+        self.vgg_backbone = backbone
+        self.num_classes = num_classes 
+        self.row = row
+        self.line = line
+
+        num_anchor_points = row * line
+
+        self.classification = ClassificationModel(num_features_in=256,
+                                                  num_classes=self.num_classes,
+                                                  num_anchor_points=num_anchor_points)
+        self.fpn  = Decoder(256, 512, 512)
+
+    def forward(self, samples:NestedTensor):
+        # get the backbone (vgg) features
+        features = self.vgg_backbone(samples)
+        # construct the feature space
+        features_fpn = self.fpn([features[0], features[1], features[2]])
+        batch_size = features[0].shape[0]
+
+        # pass through the classifer
+        classification = self.classification(features_fpn[1])
+        output_class = classification
+
+        out = {"pred_logits": output_class}
+
+        return out
+    
+
+"""
+Create objective function that does classification only from the grid of points
+"""
+class SetCriterion_Classification(nn.Module):
+    
+    def __init__(self,matcher,num_classes):
+        super().__init__()
+        self.matcher = matcher# this is the same matcher used in the P2P step
+        self.num_classes = num_classes
+
+    def loss_labels(self, outputs, targets, indicies, num_points):
+        """ CE Loss: between each point proposal and corresponding ground truth point
+        
+        """
+        # calculate the point proposals from each input patch
+        assert "pred_logits" in outputs
+        src_logits = outputs['pred_logits']
+
+        idx = self._get_src_permutation_idx(indices)
+        target_classes_o = torch.cat([t["labels"][J] for t, (_, J) in zip(targets, indices)])
+        target_classes = torch.full(src_logits.shape[:2], 0,
+                                    dtype=torch.int64, device=src_logits.device)
+
+        target_classes[idx] = target_classes_o
+
+        loss_ce = F.cross_entropy(src_logits.transpose(1, 2), target_classes, self.empty_weight)
+        losses = {'loss_ce': loss_ce}
+        
+        return losses
+    
+    def forward(self, outputs, regression_outputs, targets):
+        """ loss computation
+        """
+        regression_outputs = {'pred_logits': regression_outputs['pred_logits'],
+                              'pred_points': regression_outputs['pred_points']}
+        indicies = self.matcher(regression_outputs, targets)
+
+        num_points = sum(len(t['labels']) for t in targets)
+        num_points = torch.as_tensor([num_points], dtype=torch.float, device=next(iter(output1.values())).device)
+
+        losses = {}
+        losses.update(loss_labels(outputs, targets, indicies, num_points))
+        
+        return losses
+
+"""
+Create objective function for the P2P pipeline, both classification and regression
+"""
 class SetCriterion_Crowd(nn.Module):
 
     def __init__(self, num_classes, matcher, weight_dict, eos_coef, losses):
@@ -353,7 +437,7 @@ class SetCriterion_Crowd(nn.Module):
         return losses, classwise_losses
 
 # create the P2PNet model
-def build(args, training):
+def build_p2p(args, training):
     # treats persons as a single class
 
     backbone = build_backbone(args)
@@ -367,5 +451,20 @@ def build(args, training):
     criterion = SetCriterion_Crowd(args.num_classes, \
                                 matcher=matcher, weight_dict=weight_dict, \
                                 eos_coef=args.eos_coef, losses=losses)
+
+    return model, criterion
+
+def build_multiclass(args, training):
+
+    backbone = build_backbone(args)
+    model = FineClassifier(backbone, args.num_classes,
+                            args.row, args.line)
+    if not training:
+        return model
+    
+    # build the matcher based on original P2P model
+    matcher = build_matcher_crowd(args)
+    criterion = SetCriterion_Classification(matcher=matcher, 
+                                            num_classes=args.num_classes)
 
     return model, criterion
