@@ -135,8 +135,7 @@ def load_data(img_gt_path, train, multiclass):
     points = []  
 
     # assign a class
-    label_class = None
-    
+    label_class = None 
     if multiclass:
         if "L1" in img_path:
             label_class = "L1"

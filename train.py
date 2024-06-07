@@ -71,6 +71,8 @@ def get_args_parser():
                               folder""")
     parser.add_argument('--output_dir', default='./results',
                         help='path where to save, empty for no saving')
+    parser.add_argument("--multiclass", default=0, type=int,
+                        help="boolean that decides whether class labels should be considered")
 
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--resume', default='', help='resume from checkpoint')
@@ -143,7 +145,13 @@ def main(args):
     # create the dataset
     loading_data = build_dataset(args=args)
     # create the training and valiation set
-    train_set, val_set = loading_data(args.data_root)
+    # sidenote: convert mutliclass arg to a bool value from binary int
+    if args.multiclass == 1: multiclass=True
+    elif args.multiclass == 0: multiclass = False
+    else: 
+        multiclass=None
+        print(f"This: {args.multiclass} value is not an accepted value for args.mutliclass")
+    train_set, val_set = loading_data(args.data_root, multiclass)
     # create the sampler used during training
     sampler_train = torch.utils.data.RandomSampler(train_set)
     sampler_val = torch.utils.data.SequentialSampler(val_set)
