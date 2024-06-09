@@ -24,7 +24,7 @@ def get_args_parser():
     parser = argparse.ArgumentParser('Set parameters for training classifier', add_help=False)
     parser.add_argument('--lr', default=1e-4, type=float)
     parser.add_argument('--lr_backbone', default=1e-5, type=float)
-    parser.add_argument('--batch_size', default=2, type=int)
+    parser.add_argument('--batch_size', default=8, type=int)
     parser.add_argument('--weight_decay', default=1e-4, type=float)
     parser.add_argument('--epochs', default=3500, type=int)
     parser.add_argument('--lr_drop', default=3500, type=int)
@@ -42,7 +42,7 @@ def get_args_parser():
                         help="Name of the convolutional backbone to use")
     parser.add_argument('--num_classes', default=1, type=int,
                         help="number of non NONE type classes")
-    parser.add_argument('--downstream_num_classe', default=2, type=int,
+    parser.add_argument('--downstream_num_classes', default=2, type=int,
                         help="number of classes for downstream fine grained classification")
     # * Loss coefficients
     parser.add_argument('--point_loss_coef', default=0.0002, type=float)
@@ -125,7 +125,6 @@ def main(args):
     checkpoint = torch.load(args.point_weights, map_location="cpu")
     regr_model.load_state_dict(checkpoint["model"])
     regr_model.to(device)
-    regr_model.eval()
 
 
     ### BUILD CLASSIFIER 
@@ -179,15 +178,16 @@ def main(args):
         t1 = time.time()
         stat = train_one_epoch_classifier(regr_model, model, criterion,
                                           data_loader_train, optimizer, device, epoch)
+        print(f"Avg Loss:   loss_ce: {stat['loss_ce']}")
         if writer is not None:
             writer.add_scalar('loss/loss_ce', stat['loss_ce'], epoch)
         t2 = time.time()
         print('[ep %d][lr %.7f][%.2fs]' % \
               (epoch, optimizer.param_groups[0]['lr'], t2 - t1))
-  
+
         lr_scheduler.step()
         checkpoint_latest_path = os.path.join(weight_path, 'latest.pth')
-        torch.save({'model': torch.state_dict()}, checkpoint_latest_path)
+        torch.save({'model': model.state_dict()}, checkpoint_latest_path)
 
     # total time for training
     total_time = time.time() - start_time
@@ -195,6 +195,9 @@ def main(args):
     print('Training time {}'.format(total_time_str))
 
 if __name__ == '__main__':
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
+
     parser = argparse.ArgumentParser('Point Proposal Classifier training and evaluation script', parents=[get_args_parser()])
     args = parser.parse_args()
     main(args)

@@ -251,7 +251,7 @@ class FineClassifier(nn.Module):
         # get the backbone (vgg) features
         features = self.vgg_backbone(samples)
         # construct the feature space
-        features_fpn = self.fpn([features[0], features[1], features[2]])
+        features_fpn = self.fpn([features[1], features[2], features[3]])
         batch_size = features[0].shape[0]
 
         # pass through the classifer
@@ -273,7 +273,7 @@ class SetCriterion_Classification(nn.Module):
         self.matcher = matcher# this is the same matcher used in the P2P step
         self.num_classes = num_classes
 
-    def loss_labels(self, outputs, targets, indicies, num_points):
+    def loss_labels(self, outputs, targets, indices, num_points):
         """ CE Loss: between each point proposal and corresponding ground truth point
         
         """
@@ -288,11 +288,23 @@ class SetCriterion_Classification(nn.Module):
 
         target_classes[idx] = target_classes_o
 
-        loss_ce = F.cross_entropy(src_logits.transpose(1, 2), target_classes, self.empty_weight)
+        loss_ce = F.cross_entropy(src_logits.transpose(1, 2), target_classes)
         losses = {'loss_ce': loss_ce}
         
         return losses
-    
+
+    def _get_src_permutation_idx(self, indices):
+        # permute predictions following indices
+        batch_idx = torch.cat([torch.full_like(src, i) for i, (src, _) in enumerate(indices)])
+        src_idx = torch.cat([src for (src, _) in indices])
+        return batch_idx, src_idx
+
+    def _get_tgt_permutation_idx(self, indices):
+        # permute targets following indices
+        batch_idx = torch.cat([torch.full_like(tgt, i) for i, (_, tgt) in enumerate(indices)])
+        tgt_idx = torch.cat([tgt for (_, tgt) in indices])
+        return batch_idx, tgt_idx
+
     def forward(self, outputs, regression_outputs, targets):
         """ loss computation
         """
@@ -301,10 +313,10 @@ class SetCriterion_Classification(nn.Module):
         indicies = self.matcher(regression_outputs, targets)
 
         num_points = sum(len(t['labels']) for t in targets)
-        num_points = torch.as_tensor([num_points], dtype=torch.float, device=next(iter(output1.values())).device)
+        num_points = torch.as_tensor([num_points], dtype=torch.float, device=next(iter(regression_outputs.values())).device)
 
         losses = {}
-        losses.update(loss_labels(outputs, targets, indicies, num_points))
+        losses.update(self.loss_labels(outputs, targets, indicies, num_points))
         
         return losses
 
@@ -457,7 +469,7 @@ def build_p2p(args, training):
 def build_multiclass(args, training):
 
     backbone = build_backbone(args)
-    model = FineClassifier(backbone, args.num_classes,
+    model = FineClassifier(backbone, args.downstream_num_classes,
                             args.row, args.line)
     if not training:
         return model
@@ -465,6 +477,6 @@ def build_multiclass(args, training):
     # build the matcher based on original P2P model
     matcher = build_matcher_crowd(args)
     criterion = SetCriterion_Classification(matcher=matcher, 
-                                            num_classes=args.num_classes)
+                                            num_classes=args.downstream_num_classes)
 
     return model, criterion
