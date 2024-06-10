@@ -157,7 +157,46 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     print("Averaged stats:", metric_logger)
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}, classwise_loss_total_epoch
 
-# the inference routine
+
+@torch.no_grad()
+def evaluate_crowd_w_fine_grained(regr_model, class_model, data_loader, device, vis_dir="./visres"):
+    """ 
+    Compute regression points and corresponding classes based off regression to classification framework 
+    Parameters:
+    regr_model: P2P model --> nn.Module
+    class_model: classification model --> nn.Module
+    data_loader: validation dataloader --> utils.DataLoader
+    """
+
+    regr_model.eval()
+    class_model.eval()
+    
+    for samples,targets in data_loader:
+        samples.to(device)
+        
+        # two forward passes
+        regression_outputs = regr_model(samples)
+        classification_outputs = class_model(samples)
+
+        regression_points = regression_outputs['pred_points']
+        regression_scores = regression_outputs['pred_logits']
+
+        classification_score = classification_outputs['pred_logits']
+    
+        gt_cnt = targets[0]['point'].shape[0]
+        # regression threshold
+        threshold = 0.5
+
+        # pick out point proposals
+        points = regression_points[regression_scores > threshold].detach().cpu().numpy().tolist()
+        pred_cnt = int((regression_score > threshold).sum())
+
+        # point logits of regressed points
+        class_logits = classification_score[regression_scores > threshold].detach().cpu().numpy().tolist()
+        print(points)
+        print(class_logits)
+
+# the inference routine for p2p net
 @torch.no_grad()
 def evaluate_crowd_no_overlap(model, data_loader, device, vis_dir="./visres"):
     model.eval()
@@ -181,7 +220,9 @@ def evaluate_crowd_no_overlap(model, data_loader, device, vis_dir="./visres"):
 
         points = outputs_points[outputs_scores > threshold].detach().cpu().numpy().tolist()
         predict_cnt = int((outputs_scores > threshold).sum())
-        
+       
+        print(points)
+
         # if specified, save the visualized images
         if vis_dir is not None: 
             vis(samples, targets, [points], vis_dir)

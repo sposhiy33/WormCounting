@@ -187,7 +187,7 @@ def main(args):
 
         lr_scheduler.step()
         checkpoint_latest_path = os.path.join(weight_path, 'latest.pth')
-        torch.save({'model': model.state_dict()}, checkpoint_latest_path)
+        torch.save({'model': model_without_ddp.state_dict()}, checkpoint_latest_path)
 
     # total time for training
     total_time = time.time() - start_time
