@@ -12,7 +12,7 @@ def loading_data(data_root, multiclass=False):
                                     ])
   
     # "patch" must be set to true in order to ensure that images fit the correct aspect ratio
-    train_set = WORM(data_root, train=True, transform=transform, patch=True, rotate=False, scale=True, flip=False, multiclass=multiclass)
+    train_set = WORM(data_root, train=True, transform=transform, patch=True, rotate=False, scale=False, flip=False, multiclass=multiclass)
     val_set = WORM(data_root, train=False, transform=transform, multiclass=multiclass)
 
     return train_set, val_set

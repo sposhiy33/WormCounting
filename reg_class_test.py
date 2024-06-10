@@ -27,6 +27,8 @@ def get_arg_parser():
     parser.add_argument("--class_weights", type=str,
                         help="Path to model checkpoint of fine grained classification model")
     parser.add_argument("--result_dir", type=str)
+    parser.add_argument("--multiclass", type=bool, default=True,
+                        help="whether or not class labels are ingorned upon intializing the dataset")
 
     parser.add_argument('--row', default=2, type=int,
                         help="row number of anchor points")
@@ -75,7 +77,7 @@ def main(args):
     print(args)
 
     # create the training and valiation set
-    train_set, val_set = loading_data(args.dataroot)
+    train_set, val_set = loading_data(args.dataroot, args.multiclass)
     # create the sampler used during training
     sampler_train = torch.utils.data.RandomSampler(train_set)
     sampler_val = torch.utils.data.SequentialSampler(val_set)

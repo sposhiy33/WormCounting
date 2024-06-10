@@ -49,7 +49,7 @@ class ClassificationModel(nn.Module):
     def __init__(self, num_features_in, num_anchor_points=4, num_classes=80, prior=0.01, feature_size=256):
         super(ClassificationModel, self).__init__()
 
-        self.num_classes = num_classes
+        self.num_classes = num_classes + 1
         self.num_anchor_points = num_anchor_points
 
         self.conv1 = nn.Conv2d(num_features_in, feature_size, kernel_size=3, padding=1)

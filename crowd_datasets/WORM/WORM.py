@@ -115,9 +115,9 @@ class WORM(Dataset):
                 labels = torch.zeros([point[i].shape[0]]).long() 
                 for l in range(labels.size()[0]): 
                     if label_class == "L1":
-                        labels[l] = 0
-                    elif label_class == "ADT":
                         labels[l] = 1
+                    elif label_class == "ADT":
+                        labels[l] = 2
             else:
                 labels = torch.ones([point[i].shape[0]]).long()       
 

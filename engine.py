@@ -27,11 +27,12 @@ class DeNormalize(object):
             t.mul_(s).add_(m)
         return tensor
 
-def vis(samples, targets, pred, vis_dir, des=None):
+def vis(samples, targets, pred, vis_dir, class_labels=None, des=None):
     '''
     samples -> tensor: [batch, 3, H, W]
     targets -> list of dict: [{'points':[], 'image_id': str}]
     pred -> list: [num_preds, 2]
+    class -> list: [num_preds] -- predicited class of each predicted point
     '''
     gts = [t['point'].tolist() for t in targets]
 
@@ -55,8 +56,15 @@ def vis(samples, targets, pred, vis_dir, des=None):
         for t in gts[idx]:
             sample_gt = cv2.circle(sample_gt, (int(t[0]), int(t[1])), size, (0, 255, 0), -1)
         # draw predictions
-        for p in pred[idx]:
-            sample_pred = cv2.circle(sample_pred, (int(p[0]), int(p[1])), size, (0, 0, 255), -1)
+        for i,p in enumerate(pred[idx]):
+            if class_labels is not None:
+                if class_labels[i] == 0:
+                    sample_pred = cv2.circle(sample_pred, (int(p[0]), int(p[1])), size, (0, 0, 255), -1)
+                elif class_labels[i] == 1:
+                    sample_pred = cv2.circle(sample_pred, (int(p[0]), int(p[1])), size, (200, 0, 0), -1)
+                else: pass
+            else:
+                sample_pred = cv2.circle(sample_pred, (int(p[0]), int(p[1])), size, (0, 0, 255), -1)
 
         name = targets[idx]['image_id']
         # save the visualized images
@@ -167,34 +175,44 @@ def evaluate_crowd_w_fine_grained(regr_model, class_model, data_loader, device, 
     class_model: classification model --> nn.Module
     data_loader: validation dataloader --> utils.DataLoader
     """
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     regr_model.eval()
     class_model.eval()
-    
+    regr_model.to(device)
+    class_model.to(device)
+
     for samples,targets in data_loader:
-        samples.to(device)
-        
+        samples = samples.to(device)
+        print(targets[0]['labels'].size())
         # two forward passes
         regression_outputs = regr_model(samples)
         classification_outputs = class_model(samples)
 
-        regression_points = regression_outputs['pred_points']
+        regression_points = regression_outputs['pred_points'][0]
         regression_scores = regression_outputs['pred_logits']
+        regression_scores = torch.nn.functional.softmax(regression_scores, -1)[:, :, 1][0]
+        classification_score = classification_outputs['pred_logits'][0]
+      
+        classification_score = torch.nn.functional.softmax(classification_score, -1)
 
-        classification_score = classification_outputs['pred_logits']
-    
         gt_cnt = targets[0]['point'].shape[0]
         # regression threshold
         threshold = 0.5
-
+        
         # pick out point proposals
         points = regression_points[regression_scores > threshold].detach().cpu().numpy().tolist()
-        pred_cnt = int((regression_score > threshold).sum())
+        pred_cnt = int((regression_scores > threshold).sum())
 
-        # point logits of regressed points
+        # point logits of regressed points 
         class_logits = classification_score[regression_scores > threshold].detach().cpu().numpy().tolist()
-        print(points)
-        print(class_logits)
+        class_labels = torch.zeros([len(class_logits)])
+        for i,logit in enumerate(class_logits):
+            class_labels[i] = logit.index(max(logit))
+        class_labels = class_labels.numpy().tolist()
+
+        if vis_dir is not None:
+            vis(samples, targets, [points], vis_dir, class_labels=class_labels)
 
 # the inference routine for p2p net
 @torch.no_grad()
