@@ -36,7 +36,7 @@ def get_arg_parser():
                         help="line number of anchor points")
     parser.add_argument("--num_classes", type=int, default=1,
                         help="number of non no-person classes")
-    parser.add_argument("--downstream_num_classes", type=int, default=2,
+    parser.add_argument("--downstream_num_classes", type=int, default=3,
                         help="number of classes for fine grained classification")
     parser.add_argument("--dataroot", type=str)
     parser.add_argument("--dataset_file", default="WORM_VAL")

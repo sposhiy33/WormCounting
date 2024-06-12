@@ -61,7 +61,7 @@ class WORM(Dataset):
         img_path = self.img_list[index]
         gt_path = self.img_map[img_path]
         # load image and ground truth
-        img, point, label_class = load_data((img_path, gt_path), self.train, self.multiclass)
+        img, point, labels = load_data((img_path, gt_path), self.train, self.multiclass)
         # apply augumentation
         if self.transform is not None:
             img = self.transform(img)
@@ -84,12 +84,6 @@ class WORM(Dataset):
             for i, _ in enumerate(point):
                 point[i] = torch.Tensor(point[i])
 
-            # apply rotation transformation for data balacing
-            if self.rotate: 
-                patch_expansion = 1
-                if label_class == "L1": patch_expansion=1
-                elif label_class == "ADT": patch_expansion=8
-                img, point = random_rotate(img, point, patch_expansion)
         
         # random flipping
         if random.random() > 0.5 and self.train and self.flip:
@@ -109,19 +103,7 @@ class WORM(Dataset):
             image_id = int(img_path.split('/')[-1].split('.')[0].split('_')[-1])
             image_id = torch.Tensor([image_id]).long()
             target[i]['image_id'] = image_id
-           
-            # for multiclass classification, assign labels 
-            if label_class is not None:
-                labels = torch.zeros([point[i].shape[0]]).long() 
-                for l in range(labels.size()[0]): 
-                    if label_class == "L1":
-                        labels[l] = 1
-                    elif label_class == "ADT":
-                        labels[l] = 2
-            else:
-                labels = torch.ones([point[i].shape[0]]).long()       
-
-            target[i]['labels'] = labels
+            target[i]['labels'] = torch.Tensor(labels).long()
         
         return img, target
 
@@ -135,27 +117,33 @@ def load_data(img_gt_path, train, multiclass):
     points = []  
 
     # assign a class
-    label_class = None 
-    if multiclass:
-        if "L1" in img_path:
-            label_class = "L1"
-        elif "ADT" in img_path:
-            label_class = "ADT"
-
+    labels = []
     with open(gt_path) as f_label:
         for line in f_label:
-            print(line)
-
             if "\t" in line:
+                elements = len(line.strip().split("\t"))
                 x = float(line.strip().split("\t")[0].strip()) 
                 y = float(line.strip().split("\t")[1].strip())
                 points.append([x,y])
+                
+                # create labels
+                if multiclass:
+                    if elements == 3:
+                        lab = str(line.strip().split("\t")[2].strip())
+                        if lab == "Gravid": labels.append(2)
+                        elif lab == "L1": labels.append(1)
+                    else:
+                        if "L1" in img_path: labels.append(1)
+                        elif "ADT" in img_path: labels.append(2)
+                else: labels.append(1)
+
+
             else:
                 x = float(line.strip().split(' ')[0].replace(",", ""))
                 y = float(line.strip().split(' ')[1])
                 points.append([x, y])
-        
-    return img, np.array(points), label_class
+       
+    return img, np.array(points), labels
 
 def random_rotate(img, den, num_examples):
     
