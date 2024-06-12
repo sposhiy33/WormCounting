@@ -144,6 +144,8 @@ def load_data(img_gt_path, train, multiclass):
 
     with open(gt_path) as f_label:
         for line in f_label:
+            print(line)
+
             if "\t" in line:
                 x = float(line.strip().split("\t")[0].strip()) 
                 y = float(line.strip().split("\t")[1].strip())

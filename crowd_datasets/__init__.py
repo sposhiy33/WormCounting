@@ -8,4 +8,8 @@ def build_dataset(args):
         from crowd_datasets.WORM.loading_data import loading_data
         return loading_data
 
+    elif args.dataset_file == "WORM_VAL":
+        from crowd_datasets.WORM.loading_data import loading_data_val
+        return loading_data_val
+
     return None

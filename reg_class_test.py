@@ -39,7 +39,7 @@ def get_arg_parser():
     parser.add_argument("--downstream_num_classes", type=int, default=2,
                         help="number of classes for fine grained classification")
     parser.add_argument("--dataroot", type=str)
-    parser.add_argument("--dataset_file", default="SHHA")
+    parser.add_argument("--dataset_file", default="WORM_VAL")
 
     ## throwaway args
     parser.add_argument("--batch_size", default=8, type=int)
@@ -77,16 +77,9 @@ def main(args):
     print(args)
 
     # create the training and valiation set
-    train_set, val_set = loading_data(args.dataroot, args.multiclass)
+    val_set = loading_data(args.dataroot, args.multiclass)
     # create the sampler used during training
-    sampler_train = torch.utils.data.RandomSampler(train_set)
     sampler_val = torch.utils.data.SequentialSampler(val_set)
-
-    batch_sampler_train = torch.utils.data.BatchSampler(
-        sampler_train, args.batch_size, drop_last=True)
-    # the dataloader for training
-    data_loader_train = DataLoader(train_set, batch_sampler=batch_sampler_train,
-                                   collate_fn=utils.collate_fn_crowd, num_workers=args.num_workers)
 
     data_loader_val = DataLoader(val_set, 1, sampler=sampler_val,
                                     drop_last=False, collate_fn=utils.collate_fn_crowd, num_workers=args.num_workers)

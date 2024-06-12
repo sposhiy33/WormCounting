@@ -17,6 +17,20 @@ def loading_data(data_root, multiclass=False):
 
     return train_set, val_set
 
+def loading_data_val(data_root, multiclass=False):
+
+    # the pre-proccssing transform
+    transform = standard_transforms.Compose([
+                                    standard_transforms.ToTensor(), 
+                                    standard_transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                                                  std=[0.229, 0.224, 0.225]),
+                                    ])
+  
+    val_set = WORM(data_root, train=False, transform=transform, multiclass=multiclass)
+
+    return val_set
+
+
 def load_viz_data(data_root, multiclass=False):
 
     # transform to tensor

@@ -51,7 +51,7 @@ def vis(samples, targets, pred, vis_dir, class_labels=None, des=None):
 
         max_len = np.max(sample_gt.shape)
 
-        size = 6
+        size = 4
         # draw gt
         for t in gts[idx]:
             sample_gt = cv2.circle(sample_gt, (int(t[0]), int(t[1])), size, (0, 255, 0), -1)
@@ -59,9 +59,11 @@ def vis(samples, targets, pred, vis_dir, class_labels=None, des=None):
         for i,p in enumerate(pred[idx]):
             if class_labels is not None:
                 if class_labels[i] == 0:
-                    sample_pred = cv2.circle(sample_pred, (int(p[0]), int(p[1])), size, (0, 0, 255), -1)
+                    sample_pred = cv2.circle(sample_pred, (int(p[0]), int(p[1])), size, (225, 0, 255), -1)
                 elif class_labels[i] == 1:
-                    sample_pred = cv2.circle(sample_pred, (int(p[0]), int(p[1])), size, (200, 0, 0), -1)
+                    sample_pred = cv2.circle(sample_pred, (int(p[0]), int(p[1])), size, (255, 0, 0), -1)
+                elif class_labels[i] == 2:
+                    sample_pred = cv2.circle(sample_pred, (int(p[0]), int(p[1])), size, (0, 0, 255), -1)
                 else: pass
             else:
                 sample_pred = cv2.circle(sample_pred, (int(p[0]), int(p[1])), size, (0, 0, 255), -1)
@@ -208,6 +210,8 @@ def evaluate_crowd_w_fine_grained(regr_model, class_model, data_loader, device, 
         class_logits = classification_score[regression_scores > threshold].detach().cpu().numpy().tolist()
         class_labels = torch.zeros([len(class_logits)])
         for i,logit in enumerate(class_logits):
+            # ignore the no-worm class
+            logit[0] = 0
             class_labels[i] = logit.index(max(logit))
         class_labels = class_labels.numpy().tolist()
 
