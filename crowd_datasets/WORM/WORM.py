@@ -11,7 +11,7 @@ import scipy.io as io
 
 class WORM(Dataset):
     def __init__(self, data_root, transform=None, train=False, 
-                            scale=False, rotate=False, patch=False, flip=False, multiclass=False):
+                            scale=False, rotate=False, patch=False, flip=False, multiclass=False, hsv=False):
         self.root_path = data_root
         
         if "worm_dataset" in self.root_path:
@@ -51,6 +51,7 @@ class WORM(Dataset):
         self.scale = scale
         self.flip = flip
         self.multiclass = multiclass
+        self.hsv = hsv
         
     def __len__(self):
         return self.nSamples
@@ -78,7 +79,7 @@ class WORM(Dataset):
         
         # random crop augumentaiton
         if self.train and self.patch:
-            img, point = random_crop(img, point)
+            img, point, labels = random_crop(img, point, labels)
 
             # convert point arrays for each image to torch Tensor type
             for i, _ in enumerate(point):
@@ -91,6 +92,9 @@ class WORM(Dataset):
             img = torch.Tensor(img[:, :, :, ::-1].copy())
             for i, _ in enumerate(point):
                 point[i][:, 0] = 128 - point[i][:, 0]
+        
+        if self.hsv:
+            img = rgb_to_hsv(img)
 
         if not self.train:
             point = [point]
@@ -103,7 +107,7 @@ class WORM(Dataset):
             image_id = int(img_path.split('/')[-1].split('.')[0].split('_')[-1])
             image_id = torch.Tensor([image_id]).long()
             target[i]['image_id'] = image_id
-            target[i]['labels'] = torch.Tensor(labels).long()
+            target[i]['labels'] = torch.Tensor(labels[i].tolist()).long()
         
         return img, target
 
@@ -128,10 +132,12 @@ def load_data(img_gt_path, train, multiclass):
                 
                 # create labels
                 if multiclass:
+                    # if the label is included in the point txt file, use this scheme
                     if elements == 3:
                         lab = str(line.strip().split("\t")[2].strip())
                         if lab == "Gravid": labels.append(2)
                         elif lab == "L1": labels.append(1)
+                    # else infer label from the img file name
                     else:
                         if "L1" in img_path: labels.append(1)
                         elif "ADT" in img_path: labels.append(2)
@@ -142,15 +148,36 @@ def load_data(img_gt_path, train, multiclass):
                 x = float(line.strip().split(' ')[0].replace(",", ""))
                 y = float(line.strip().split(' ')[1])
                 points.append([x, y])
-       
-    return img, np.array(points), labels
+    return img, np.array(points), np.array(labels)
+
+def rgb_to_hsv(rgb):
+    """
+    Implementation taken from: https://github.com/limacv/RGB_HSV_HSL/blob/master/color_torch.py
+    Parameters:
+    img --> torch.Tensor of shape 
+    """
+    print("HSV")
+    rgb = torch.Tensor(rgb)
+    cmax, cmax_idx = torch.max(rgb, dim=1, keepdim=True)
+    cmin = torch.min(rgb, dim=1, keepdim=True)[0]
+    delta = cmax - cmin
+    hsv_h = torch.empty_like(rgb[:, 0:1, :, :])
+    cmax_idx[delta == 0] = 3
+    hsv_h[cmax_idx == 0] = (((rgb[:, 1:2] - rgb[:, 2:3]) / delta) % 6)[cmax_idx == 0]
+    hsv_h[cmax_idx == 1] = (((rgb[:, 2:3] - rgb[:, 0:1]) / delta) + 2)[cmax_idx == 1]
+    hsv_h[cmax_idx == 2] = (((rgb[:, 0:1] - rgb[:, 1:2]) / delta) + 4)[cmax_idx == 2]
+    hsv_h[cmax_idx == 3] = 0.
+    hsv_h /= 6.
+    hsv_s = torch.where(cmax == 0, torch.tensor(0.).type_as(rgb), delta / cmax)
+    hsv_v = cmax
+    return torch.cat([hsv_h, hsv_s, hsv_v], dim=1)
+
 
 def random_rotate(img, den, num_examples):
     
     # takes n patches and creates n*num_examples from each
     result_img = np.zeros([num_examples*len(img), img[0].shape[0], img[0].shape[1], img[0].shape[2]])
     result_den = []
-
 
     # rotate each patch, num_examples number of times (along with corresponding points)
     for i,patch in enumerate(img):
@@ -170,12 +197,13 @@ def random_rotate(img, den, num_examples):
     return result_img, result_den
              
 # random crop augumentation
-def random_crop(img, den, num_patch=4):
+def random_crop(img, den, labels, num_patch=4):
 
     half_h = img.size()[1]//4
     half_w = img.size()[2]//4
     result_img = np.zeros([num_patch, img.shape[0], half_h, half_w])
     result_den = []
+    result_lab = []
     # crop num_patch for each image
     # keep sampling patches until all have non-zero number of samples in them (hence the while loop)
     current_count = 0
@@ -188,6 +216,7 @@ def random_crop(img, den, num_patch=4):
         idx = (den[:, 0] >= start_w) & (den[:, 0] <= end_w) & (den[:, 1] >= start_h) & (den[:, 1] <= end_h)
         # shift the corrdinates
         record_den = den[idx]
+        record_lab = labels[idx]
 
         if len(record_den) > 0:
             # copy the cropped rect
@@ -195,6 +224,7 @@ def random_crop(img, den, num_patch=4):
             record_den[:, 0] -= start_w
             record_den[:, 1] -= start_h
             result_den.append(record_den)
+            result_lab.append(record_lab)
             current_count += 1 
 
-    return result_img, result_den
+    return result_img, result_den, result_lab

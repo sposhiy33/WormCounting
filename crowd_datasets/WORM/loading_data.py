@@ -2,7 +2,7 @@ import torch
 import torchvision.transforms as standard_transforms
 from .WORM import WORM
 
-def loading_data(data_root, multiclass=False):
+def loading_data(data_root, multiclass=False, hsv=False):
 
     # the pre-proccssing transform
     transform = standard_transforms.Compose([
@@ -12,12 +12,11 @@ def loading_data(data_root, multiclass=False):
                                     ])
   
     # "patch" must be set to true in order to ensure that images fit the correct aspect ratio
-    train_set = WORM(data_root, train=True, transform=transform, patch=True, rotate=False, scale=False, flip=False, multiclass=multiclass)
-    val_set = WORM(data_root, train=False, transform=transform, multiclass=multiclass)
-
+    train_set = WORM(data_root, train=True, transform=transform, patch=True, rotate=False, scale=False, flip=False, multiclass=multiclass, hsv=hsv)
+    val_set = WORM(data_root, train=False, transform=transform, multiclass=multiclass, hsv=hsv)
     return train_set, val_set
 
-def loading_data_val(data_root, multiclass=False):
+def loading_data_val(data_root, multiclass=False, hsv=False):
 
     # the pre-proccssing transform
     transform = standard_transforms.Compose([
@@ -26,7 +25,7 @@ def loading_data_val(data_root, multiclass=False):
                                                                   std=[0.229, 0.224, 0.225]),
                                     ])
   
-    val_set = WORM(data_root, train=False, transform=transform, multiclass=multiclass)
+    val_set = WORM(data_root, train=False, transform=transform, multiclass=multiclass, hsv=hsv)
 
     return val_set
 
