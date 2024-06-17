@@ -27,8 +27,10 @@ def get_arg_parser():
     parser.add_argument("--class_weights", type=str,
                         help="Path to model checkpoint of fine grained classification model")
     parser.add_argument("--result_dir", type=str)
-    parser.add_argument("--multiclass", type=bool, default=True,
+    parser.add_argument("--multiclass", action="store_true",
                         help="whether or not class labels are ingorned upon intializing the dataset")
+    parser.add_argument("--hsv", action="store_true",
+                        help="whether or not hsv channels are used")
 
     parser.add_argument('--row', default=2, type=int,
                         help="row number of anchor points")

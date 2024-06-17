@@ -183,10 +183,14 @@ def evaluate_crowd_w_fine_grained(regr_model, class_model, data_loader, device, 
     class_model.eval()
     regr_model.to(device)
     class_model.to(device)
+    
+    l1_count = 0 
+    adult_count = 0 
+    gt_l1_count = 0
+    gt_adult_count = 0
 
     for samples,targets in data_loader:
         samples = samples.to(device)
-        print(targets[0]['labels'].size())
         # two forward passes
         regression_outputs = regr_model(samples)
         classification_outputs = class_model(samples)
@@ -197,7 +201,6 @@ def evaluate_crowd_w_fine_grained(regr_model, class_model, data_loader, device, 
         classification_score = classification_outputs['pred_logits'][0]
       
         classification_score = torch.nn.functional.softmax(classification_score, -1)
-
         gt_cnt = targets[0]['point'].shape[0]
         # regression threshold
         threshold = 0.5
@@ -214,9 +217,19 @@ def evaluate_crowd_w_fine_grained(regr_model, class_model, data_loader, device, 
             logit[0] = 0
             class_labels[i] = logit.index(max(logit))
         class_labels = class_labels.numpy().tolist()
+        targets_labels = targets[0]["labels"].detach().numpy().tolist()
+        
+        # get L1 Counts
+        l1_count += len([i for i in class_labels if i==1])
+        adult_count += len([i for i in class_labels if i==2])
+        gt_l1_count += len([i for i in targets_labels if i==1])
+        gt_adult_count += len([i for i in targets_labels if i==2])
+
 
         if vis_dir is not None:
             vis(samples, targets, [points], vis_dir, class_labels=class_labels)
+
+    print(l1_count, adult_count, gt_l1_count, gt_adult_count)
 
 # the inference routine for p2p net
 @torch.no_grad()
@@ -228,6 +241,9 @@ def evaluate_crowd_no_overlap(model, data_loader, device, vis_dir="./visres"):
     # run inference on all images to calc MAE
     maes = []
     mses = []
+
+    count = 0
+
     for samples, targets in data_loader:
         samples = samples.to(device)
 
@@ -243,8 +259,7 @@ def evaluate_crowd_no_overlap(model, data_loader, device, vis_dir="./visres"):
         points = outputs_points[outputs_scores > threshold].detach().cpu().numpy().tolist()
         predict_cnt = int((outputs_scores > threshold).sum())
        
-        print(points)
-
+        count += len(points)
         # if specified, save the visualized images
         if vis_dir is not None: 
             vis(samples, targets, [points], vis_dir)
@@ -256,5 +271,5 @@ def evaluate_crowd_no_overlap(model, data_loader, device, vis_dir="./visres"):
     # calc MAE, MSE
     mae = np.mean(maes)
     mse = np.sqrt(np.mean(mses))
-
+    print(count)
     return mae, mse

@@ -107,8 +107,11 @@ class WORM(Dataset):
             image_id = int(img_path.split('/')[-1].split('.')[0].split('_')[-1])
             image_id = torch.Tensor([image_id]).long()
             target[i]['image_id'] = image_id
-            target[i]['labels'] = torch.Tensor(labels[i].tolist()).long()
-        
+            if self.train:
+                target[i]['labels'] = torch.Tensor(labels[i].tolist()).long()
+            else:
+                target[i]['labels'] = torch.Tensor(labels.tolist()).long()
+
         return img, target
 
 
@@ -122,6 +125,7 @@ def load_data(img_gt_path, train, multiclass):
 
     # assign a class
     labels = []
+    
     with open(gt_path) as f_label:
         for line in f_label:
             if "\t" in line:
@@ -142,8 +146,6 @@ def load_data(img_gt_path, train, multiclass):
                         if "L1" in img_path: labels.append(1)
                         elif "ADT" in img_path: labels.append(2)
                 else: labels.append(1)
-
-
             else:
                 x = float(line.strip().split(' ')[0].replace(",", ""))
                 y = float(line.strip().split(' ')[1])
@@ -217,7 +219,7 @@ def random_crop(img, den, labels, num_patch=4):
         # shift the corrdinates
         record_den = den[idx]
         record_lab = labels[idx]
-
+        print(record_lab)
         if len(record_den) > 0:
             # copy the cropped rect
             result_img[current_count] = img[:, start_h:end_h, start_w:end_w]
