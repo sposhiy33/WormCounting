@@ -325,7 +325,7 @@ Create objective function for the P2P pipeline, both classification and regressi
 """
 class SetCriterion_Crowd(nn.Module):
 
-    def __init__(self, num_classes, matcher, weight_dict, eos_coef, losses):
+    def __init__(self, num_classes, matcher, weight_dict, eos_coef, ce_coef, losses):
         """ Create the criterion.
         Parameters:
             num_classes: number of object categories, omitting the special no-object category
@@ -339,9 +339,12 @@ class SetCriterion_Crowd(nn.Module):
         self.matcher = matcher
         self.weight_dict = weight_dict
         self.eos_coef = eos_coef
+        self.ce_coef = ce_coef
         self.losses = losses
         empty_weight = torch.ones(self.num_classes + 1)
         empty_weight[0] = self.eos_coef
+        for i,weight in enumerate(self.ce_coef):
+            empty_weight[i+1] = weight
         self.register_buffer('empty_weight', empty_weight)
             
     def loss_labels(self, outputs, targets, indices, num_points):
@@ -462,7 +465,7 @@ def build_p2p(args, training):
     matcher = build_matcher_crowd(args)
     criterion = SetCriterion_Crowd(args.num_classes, \
                                 matcher=matcher, weight_dict=weight_dict, \
-                                eos_coef=args.eos_coef, losses=losses)
+                                eos_coef=args.eos_coef, ce_coef=args.ce_coef, losses=losses)
 
     return model, criterion
 

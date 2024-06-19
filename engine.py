@@ -51,7 +51,7 @@ def vis(samples, targets, pred, vis_dir, class_labels=None, des=None):
 
         max_len = np.max(sample_gt.shape)
 
-        size = 4
+        size = 10
         # draw gt
         for t in gts[idx]:
             sample_gt = cv2.circle(sample_gt, (int(t[0]), int(t[1])), size, (0, 255, 0), -1)
@@ -243,6 +243,7 @@ def evaluate_crowd_no_overlap(model, data_loader, device, vis_dir="./visres"):
     mses = []
 
     count = 0
+    gt_count = 0
 
     for samples, targets in data_loader:
         samples = samples.to(device)
@@ -253,6 +254,7 @@ def evaluate_crowd_no_overlap(model, data_loader, device, vis_dir="./visres"):
         outputs_points = outputs['pred_points'][0]
 
         gt_cnt = targets[0]['point'].shape[0]
+        gt_count += gt_cnt
         # 0.5 is used by default
         threshold = 0.5
 
@@ -271,5 +273,5 @@ def evaluate_crowd_no_overlap(model, data_loader, device, vis_dir="./visres"):
     # calc MAE, MSE
     mae = np.mean(maes)
     mse = np.sqrt(np.mean(mses))
-    print(count)
+    print(f"gt_count: {gt_count}    count: {count}")
     return mae, mse

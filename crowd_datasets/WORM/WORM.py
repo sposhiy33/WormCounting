@@ -219,7 +219,6 @@ def random_crop(img, den, labels, num_patch=4):
         # shift the corrdinates
         record_den = den[idx]
         record_lab = labels[idx]
-        print(record_lab)
         if len(record_den) > 0:
             # copy the cropped rect
             result_img[current_count] = img[:, start_h:end_h, start_w:end_w]

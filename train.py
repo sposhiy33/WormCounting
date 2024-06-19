@@ -55,6 +55,8 @@ def get_args_parser():
 
     parser.add_argument('--eos_coef', default=0.5, type=float,
                         help="Relative classification weight of the no-object class")
+    parser.add_argument('--ce_coef', nargs="+", type=float,
+                        help="weighted cross entropy loss coefficients")
     parser.add_argument('--row', default=2, type=int,
                         help="row number of anchor points")
     parser.add_argument('--line', default=2, type=int,
@@ -101,6 +103,8 @@ def main(args):
     weight_path = os.path.join(result_path, "weights")
     make_dir(tb_path)
     make_dir(weight_path)
+
+    print(args.ce_coef)
     
     # make an extra directory meant for visualizations
     vis_path = os.path.join(result_path, "viz")
