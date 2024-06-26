@@ -33,6 +33,8 @@ def get_arg_parser():
                         help="number of non no-person classes")
     parser.add_argument("--dataroot", type=str)
     parser.add_argument("--dataset_file", default="WORM_VAL")
+    parser.add_argument("--multiclass", action="store_true", 
+                        help="framework to consider using the multiclass framwork or not")
 
     ## throwaway args
     parser.add_argument("--batch_size", default=8, type=int)
@@ -73,7 +75,8 @@ def main(args):
                                     drop_last=False, collate_fn=utils.collate_fn_crowd, num_workers=args.num_workers)
 
     result = evaluate_crowd_no_overlap(model, data_loader_val, device,
-                                       args.result_dir)
+                                       args.result_dir, multiclass=args.multiclass,
+                                       num_classes=args.num_classes)
     
     print(result) 
 

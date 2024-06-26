@@ -32,7 +32,7 @@ def vis(samples, targets, pred, vis_dir, class_labels=None, des=None):
     samples -> tensor: [batch, 3, H, W]
     targets -> list of dict: [{'points':[], 'image_id': str}]
     pred -> list: [num_preds, 2]
-    class -> list: [num_preds] -- predicited class of each predicted point
+    class_labels -> list: [num_preds] -- predicited class of each predicted point
     '''
     gts = [t['point'].tolist() for t in targets]
 
@@ -219,7 +219,7 @@ def evaluate_crowd_w_fine_grained(regr_model, class_model, data_loader, device, 
         class_labels = class_labels.numpy().tolist()
         targets_labels = targets[0]["labels"].detach().numpy().tolist()
         
-        # get L1 Counts
+        # get L1 CounGts
         l1_count += len([i for i in class_labels if i==1])
         adult_count += len([i for i in class_labels if i==2])
         gt_l1_count += len([i for i in targets_labels if i==1])
@@ -233,7 +233,17 @@ def evaluate_crowd_w_fine_grained(regr_model, class_model, data_loader, device, 
 
 # the inference routine for p2p net
 @torch.no_grad()
-def evaluate_crowd_no_overlap(model, data_loader, device, vis_dir="./visres"):
+def evaluate_crowd_no_overlap(model, data_loader, device, vis_dir="./visres", multiclass=False, num_classes=None):
+    """ Evaluation script to evaluate models
+    Parameters:
+    model: torch.nn.Module 
+    data_loader: torch.utils.data.DataLoader
+    device: torch.device
+    vis_dir: str path --> path where to save visualization
+    multiclass: bool --> variable that enables the multiclass framework
+    num_classes:
+    """
+
     model.eval()
 
     metric_logger = utils.MetricLogger(delimiter="  ")
@@ -249,22 +259,39 @@ def evaluate_crowd_no_overlap(model, data_loader, device, vis_dir="./visres"):
         samples = samples.to(device)
 
         outputs = model(samples)
-        outputs_scores = torch.nn.functional.softmax(outputs['pred_logits'], -1)[:, :, 1][0]
+
+        # logits and class_labels of point proposals, to be populated
+        points = []
+        class_labels = []
 
         outputs_points = outputs['pred_points'][0]
-
         gt_cnt = targets[0]['point'].shape[0]
         gt_count += gt_cnt
         # 0.5 is used by default
         threshold = 0.5
+  
+        predict_cnt = 0
 
-        points = outputs_points[outputs_scores > threshold].detach().cpu().numpy().tolist()
-        predict_cnt = int((outputs_scores > threshold).sum())
-       
+        if multiclass:
+            # iterate over each of the classes
+            for i in range(num_classes): 
+                class_idx = i + 1
+                outputs_scores = torch.nn.functional.softmax(outputs['pred_logits'], -1)[:, :, class_idx][0]
+                prop_points = outputs_points[outputs_scores > threshold].detach().cpu().numpy().tolist()
+                for p in prop_points:
+                    points.append(p)
+                logits.append(class_idx) 
+                predict_cnt += int((outputs_scores > threshold).sum())
+        else:
+            outputs_scores = torch.nn.functional.softmax(outputs['pred_logits'], -1)[:, :, 1][0]
+            points = outputs_points[outputs_scores > threshold].detach().cpu().numpy().tolist()
+            
+
         count += len(points)
         # if specified, save the visualized images
         if vis_dir is not None: 
-            vis(samples, targets, [points], vis_dir)
+            if mutliclass: vis(samples, targets, [points], vis_dir, class_labels)
+            else: vis(samples, targets, [points], vis_dir)
         # accumulate MAE, MSE
         mae = abs(predict_cnt - gt_cnt)
         mse = (predict_cnt - gt_cnt) * (predict_cnt - gt_cnt)
