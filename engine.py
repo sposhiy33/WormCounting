@@ -280,17 +280,18 @@ def evaluate_crowd_no_overlap(model, data_loader, device, vis_dir="./visres", mu
                 prop_points = outputs_points[outputs_scores > threshold].detach().cpu().numpy().tolist()
                 for p in prop_points:
                     points.append(p)
-                logits.append(class_idx) 
+                    class_labels.append(class_idx)
                 predict_cnt += int((outputs_scores > threshold).sum())
         else:
             outputs_scores = torch.nn.functional.softmax(outputs['pred_logits'], -1)[:, :, 1][0]
             points = outputs_points[outputs_scores > threshold].detach().cpu().numpy().tolist()
-            
+            predict_cnt += len(points)        
 
         count += len(points)
+
         # if specified, save the visualized images
         if vis_dir is not None: 
-            if mutliclass: vis(samples, targets, [points], vis_dir, class_labels)
+            if multiclass: vis(samples, targets, [points], vis_dir, class_labels)
             else: vis(samples, targets, [points], vis_dir)
         # accumulate MAE, MSE
         mae = abs(predict_cnt - gt_cnt)
