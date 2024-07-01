@@ -35,7 +35,7 @@ class WORM(Dataset):
             train_list = train_list.strip()
             with open(os.path.join(self.root_path, train_list)) as fin:
                 for line in fin:
-                    if len(line) < 2: 
+                    if len(line) < 2:
                         continue
                     line = line.strip().split()
                     self.img_map[os.path.join(self.root_path, line[0].strip())] = \
@@ -72,6 +72,7 @@ class WORM(Dataset):
             scale_range = [0.7, 1.3]
             min_size = min(img.shape[1:])
             scale = random.uniform(*scale_range)
+            print(scale)
             # scale the image and points
             if scale * min_size > 128:
                 img = torch.nn.functional.upsample_bilinear(img.unsqueeze(0), scale_factor=scale).squeeze(0)
@@ -85,7 +86,11 @@ class WORM(Dataset):
             for i, _ in enumerate(point):
                 point[i] = torch.Tensor(point[i])
 
-        
+        # a rotation augmentation applied at the patch level
+        if self.train and self.rotate:
+            # randomly rotate the image 
+            img, point, labels = random_rotate(img, point, labels, 4)
+         
         # random flipping
         if random.random() > 0.5 and self.train and self.flip:
             # random flip
@@ -133,7 +138,6 @@ def load_data(img_gt_path, train, multiclass):
                 x = float(line.strip().split("\t")[0].strip()) 
                 y = float(line.strip().split("\t")[1].strip())
                 points.append([x,y])
-                
                 # create labels
                 if multiclass:
                     # if the label is included in the point txt file, use this scheme
@@ -145,10 +149,12 @@ def load_data(img_gt_path, train, multiclass):
                     else:
                         if "L1" in img_path: labels.append(1)
                         elif "ADT" in img_path: labels.append(2)
+                        else: labels.append(2) # default to the adult label
                 else: labels.append(1)
             else:
                 x = float(line.strip().split(' ')[0].replace(",", ""))
                 y = float(line.strip().split(' ')[1])
+                labels.append(2)
                 points.append([x, y])
     return img, np.array(points), np.array(labels)
 
@@ -175,34 +181,44 @@ def rgb_to_hsv(rgb):
     return torch.cat([hsv_h, hsv_s, hsv_v], dim=1)
 
 
-def random_rotate(img, den, num_examples):
-    
+def random_rotate(img, den, labels, num_examples):
+  
     # takes n patches and creates n*num_examples from each
     result_img = np.zeros([num_examples*len(img), img[0].shape[0], img[0].shape[1], img[0].shape[2]])
     result_den = []
+    result_labels = []
 
     # rotate each patch, num_examples number of times (along with corresponding points)
     for i,patch in enumerate(img):
-        for j in range(num_examples): 
+        for j in range(num_examples):
+            patch_mp = [(patch.shape[1])/2, (patch.shape[2])/2]
             theta = random.randrange(1,360)
             # create rotation matrix
             sin = torch.sin(torch.Tensor([theta])).item()
             cos = torch.cos(torch.Tensor([theta])).item()
-            rot_matrix = torch.Tensor([[cos, -sin],[sin, cos]])
             
             rot_img = torchvision.transforms.functional.rotate(torch.Tensor(patch), theta)
-            rot_den = torch.matmul(den[i], rot_matrix)
-            print(rot_den.size()) 
-            result_img[(i*num_examples) + j] = rot_img
-            result_den.append(rot_den)
+            
+            rot_den = []
+            points = den[i]
+            for p in points:
+                xr = (p[0] - patch_mp[0]) * cos - (p[1] - patch_mp[1]) * sin + p[1]
+                yr = (p[0] - patch_mp[0]) * sin + (p[1] - patch_mp[1]) * cos + p[0]
+                rot_den.append([xr, yr])
 
-    return result_img, result_den
+            result_img[(i*num_examples) + j] = rot_img
+            result_den.append(np.array(rot_den))
+            result_labels.append(labels[i])
+
+    return result_img, result_den, result_labels
              
 # random crop augumentation
 def random_crop(img, den, labels, num_patch=4):
 
-    half_h = img.size()[1]//4
-    half_w = img.size()[2]//4
+    half_h = 512
+    half_w = 512
+    # half_h = img.size()[1]//4
+    # half_w = img.size()[2]//4
     result_img = np.zeros([num_patch, img.shape[0], half_h, half_w])
     result_den = []
     result_lab = []

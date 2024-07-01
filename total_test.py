@@ -63,22 +63,31 @@ def main(args):
     ### BUILD DATASET ###
     # create the dataset
     loading_data = build_dataset(args)
-    
     print(args)
 
-    # create the training and valiation set
-    val_set = loading_data(args.dataroot)
-    # create the sampler used during training
-    sampler_val = torch.utils.data.SequentialSampler(val_set)
+    # list of datasets to evaluate 
+    dataset_list = {"MULTICLASS":"dataroot/resize_multiclass",
+                    "L1":"dataroot/resize_L1",
+                    "ADULT":"dataroot/worm_dataset",
+                    "MIXED":"dataroot/resize_mixed_l1_adult"}
 
-    data_loader_val = DataLoader(val_set, 1, sampler=sampler_val,
-                                    drop_last=False, collate_fn=utils.collate_fn_crowd, num_workers=args.num_workers)
+    for i,key in enumerate(list(dataset_list.keys())):
+        
+        print(key)
+        dataroot = dataset_list[key]
+        # create the training and valiation set
+        val_set = loading_data(dataroot, multiclass=args.multiclass)
+        # create the sampler used during training
+        sampler_val = torch.utils.data.SequentialSampler(val_set)
 
-    result = evaluate_crowd_no_overlap(model, data_loader_val, device,
-                                       args.result_dir, multiclass=args.multiclass,
-                                       num_classes=args.num_classes)
-    
-    print(result) 
+        data_loader_val = DataLoader(val_set, 1, sampler=sampler_val,
+                                        drop_last=False, collate_fn=utils.collate_fn_crowd, num_workers=args.num_workers)
+        result = evaluate_crowd_no_overlap(model, data_loader_val, device,
+                                           os.path.join(args.result_dir, f"{key}_vis"), multiclass=args.multiclass,
+                                           num_classes=args.num_classes)
+        
+        print(result)
+        print("")
 
 
 if __name__ == "__main__":

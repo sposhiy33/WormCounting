@@ -252,8 +252,8 @@ def evaluate_crowd_no_overlap(model, data_loader, device, vis_dir="./visres", mu
     maes = []
     mses = []
 
-    count = 0
-    gt_count = 0
+    count = []
+    gt_count = []
 
     for samples, targets in data_loader:
         samples = samples.to(device)
@@ -265,8 +265,8 @@ def evaluate_crowd_no_overlap(model, data_loader, device, vis_dir="./visres", mu
         class_labels = []
 
         outputs_points = outputs['pred_points'][0]
+        target_labels = targets[0]['labels'].detach().numpy().tolist()
         gt_cnt = targets[0]['point'].shape[0]
-        gt_count += gt_cnt
         # 0.5 is used by default
         threshold = 0.5
   
@@ -274,6 +274,8 @@ def evaluate_crowd_no_overlap(model, data_loader, device, vis_dir="./visres", mu
 
         if multiclass:
             # iterate over each of the classes
+            target_count = []
+            proposal_count = [] 
             for i in range(num_classes): 
                 class_idx = i + 1
                 outputs_scores = torch.nn.functional.softmax(outputs['pred_logits'], -1)[:, :, class_idx][0]
@@ -281,13 +283,19 @@ def evaluate_crowd_no_overlap(model, data_loader, device, vis_dir="./visres", mu
                 for p in prop_points:
                     points.append(p)
                     class_labels.append(class_idx)
-                predict_cnt += int((outputs_scores > threshold).sum())
+                cnt = int((outputs_scores > threshold).sum())
+                predict_cnt += cnt
+                proposal_count.append(cnt)
+                target_count.append(len([i for i in target_labels if i == class_idx]))
+            count.append(proposal_count)
+            gt_count.append(target_count)
         else:
             outputs_scores = torch.nn.functional.softmax(outputs['pred_logits'], -1)[:, :, 1][0]
             points = outputs_points[outputs_scores > threshold].detach().cpu().numpy().tolist()
-            predict_cnt += len(points)        
-
-        count += len(points)
+            cnt = len(points)        
+            predict_cnt += cnt
+            gt_count.append([len(target_labels)])
+            count.append([cnt])
 
         # if specified, save the visualized images
         if vis_dir is not None: 
@@ -301,5 +309,14 @@ def evaluate_crowd_no_overlap(model, data_loader, device, vis_dir="./visres", mu
     # calc MAE, MSE
     mae = np.mean(maes)
     mse = np.sqrt(np.mean(mses))
-    print(f"gt_count: {gt_count}    count: {count}")
+
+    gt_count = np.array(gt_count)
+    count = np.array(count)
+    final_gt_count = []
+    final_count = []
+    for i in range(gt_count.shape[1]):
+        final_gt_count.append(np.sum(gt_count[:,i]))
+        final_count.append(np.sum(count[:,i]))
+    # calculate total
+    print(f"gt_count: {final_gt_count}    count: {final_count}")
     return mae, mse
