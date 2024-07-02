@@ -213,7 +213,7 @@ def random_rotate(img, den, labels, num_examples):
     return result_img, result_den, result_labels
              
 # random crop augumentation
-def random_crop(img, den, labels, num_patch=4):
+def random_crop(img, den, labels, num_patch=16):
 
     half_h = 512
     half_w = 512
