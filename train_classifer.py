@@ -54,11 +54,13 @@ def get_args_parser():
     # * Matcher
     parser.add_argument('--set_cost_class', default=1, type=float,
                         help="Class coefficient in the matching cost")
-
     parser.add_argument('--set_cost_point', default=0.05, type=float,
                         help="L1 point coefficient in the matching cost")
-
-
+    parser.add_argument('--eos_coef', default=0.5, type=float,
+                        help="relative classification weight of no-subject class")
+    parser.add_argument('--ce_coef', nargs="+", type=float,
+                        help="weighted ce coefficients of fine-grained classes")
+    
     # dataset parameters
     parser.add_argument('--dataset_file', default='SHHA')
     parser.add_argument('--data_root', default='./new_public_density_data',
@@ -70,8 +72,10 @@ def get_args_parser():
                               folder""")
     parser.add_argument('--output_dir', default='./results',
                         help='path where to save, empty for no saving')
-    parser.add_argument("--multiclass", default=1, type=int,
-                        help="boolean that decides whether class labels should be considered")
+    parser.add_argument("--multiclass", action="store_true",
+                        help="enable multiclass framework")
+    parser.add_argument("--hsv", action="store_true",
+                        help="enable hsv framework")
 
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--resume', default='', help='resume from checkpoint')
@@ -137,7 +141,7 @@ def main(args):
     # create the dataset
     loading_data = build_dataset(args)
     # create the training and valiation set
-    train_set, val_set = loading_data(args.data_root)
+    train_set, val_set = loading_data(args.data_root, args.multiclass, args.hsv)
     # create the sampler used during training
     sampler_train = torch.utils.data.RandomSampler(train_set)
     sampler_val = torch.utils.data.SequentialSampler(val_set)

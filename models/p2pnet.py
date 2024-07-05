@@ -268,10 +268,15 @@ Create objective function that does classification only from the grid of points
 """
 class SetCriterion_Classification(nn.Module):
     
-    def __init__(self,matcher,num_classes):
+    def __init__(self,matcher,num_classes,eos_coef,ce_coef):
         super().__init__()
         self.matcher = matcher# this is the same matcher used in the P2P step
         self.num_classes = num_classes
+        empty_weight = torch.ones(num_classes)
+        empty_weight[0] = eos_coef
+        for i,weight in enumerate(ce_coef):
+            empty_weight[i+1] = weight
+        self.register_buffer('empty_weight', empty_weight)
 
     def loss_labels(self, outputs, targets, indices, num_points):
         """ CE Loss: between each point proposal and corresponding ground truth point
@@ -288,7 +293,7 @@ class SetCriterion_Classification(nn.Module):
 
         target_classes[idx] = target_classes_o
 
-        loss_ce = F.cross_entropy(src_logits.transpose(1, 2), target_classes)
+        loss_ce = F.cross_entropy(src_logits.transpose(1, 2), target_classes, self.empty_weight)
         losses = {'loss_ce': loss_ce}
         
         return losses
@@ -478,8 +483,10 @@ def build_multiclass(args, training):
         return model
     
     # build the matcher based on original P2P model
-    matcher = build_matcher_crowd(args)
+    matcher = build_matcher_crowd(args, override_multiclass=True)
     criterion = SetCriterion_Classification(matcher=matcher, 
-                                            num_classes=args.downstream_num_classes)
+                                            num_classes=args.downstream_num_classes,
+                                            eos_coef=args.eos_coef,
+                                            ce_coef=args.ce_coef)
 
     return model, criterion

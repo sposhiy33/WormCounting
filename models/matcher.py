@@ -16,7 +16,7 @@ class HungarianMatcher_Crowd(nn.Module):
     while the others are un-matched (and thus treated as non-objects).
     """
 
-    def __init__(self, cost_class: float = 1, cost_point: float = 1):
+    def __init__(self, cost_class: float = 1, cost_point: float = 1, override_multiclass: bool = False):
         """Creates the matcher
 
         Params:
@@ -27,6 +27,7 @@ class HungarianMatcher_Crowd(nn.Module):
         self.cost_class = cost_class
         self.cost_point = cost_point
         assert cost_class != 0 or cost_point != 0, "all costs cant be 0"
+        self.override_multiclass = override_multiclass
 
     @torch.no_grad()
     def forward(self, outputs, targets):
@@ -59,7 +60,9 @@ class HungarianMatcher_Crowd(nn.Module):
         
         tgt_ids = torch.cat([v["labels"] for v in targets])
         tgt_points = torch.cat([v["point"] for v in targets])
-                
+        
+        if self.override_multiclass:
+            torch.ones(tgt_ids.size()[0], dtype=torch.int)
         # Compute the classification cost. Contrary to the loss, we don't use the NLL,
         # but approximate it in 1 - proba[target class].
         # The 1 is a constant that doesn't change the matching, it can be ommitted.
@@ -80,5 +83,5 @@ class HungarianMatcher_Crowd(nn.Module):
         return [(torch.as_tensor(i, dtype=torch.int64), torch.as_tensor(j, dtype=torch.int64)) for i, j in indices]
 
 
-def build_matcher_crowd(args):
-    return HungarianMatcher_Crowd(cost_class=args.set_cost_class, cost_point=args.set_cost_point)
+def build_matcher_crowd(args, override_multiclass: bool = False):
+    return HungarianMatcher_Crowd(cost_class=args.set_cost_class, cost_point=args.set_cost_point, override_multiclass=override_multiclass)
