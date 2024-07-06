@@ -51,7 +51,7 @@ def vis(samples, targets, pred, vis_dir, class_labels=None, des=None):
 
         max_len = np.max(sample_gt.shape)
 
-        size = 10
+        size = 2
         # draw gt
         for t in gts[idx]:
             sample_gt = cv2.circle(sample_gt, (int(t[0]), int(t[1])), size, (0, 255, 0), -1)
@@ -203,7 +203,7 @@ def evaluate_crowd_w_fine_grained(regr_model, class_model, data_loader, device, 
         classification_score = torch.nn.functional.softmax(classification_score, -1)
         gt_cnt = targets[0]['point'].shape[0]
         # regression threshold
-        threshold = 0.5
+        threshold = 0.55
         
         # pick out point proposals
         points = regression_points[regression_scores > threshold].detach().cpu().numpy().tolist()
