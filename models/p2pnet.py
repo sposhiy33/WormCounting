@@ -503,7 +503,7 @@ class SetCriterion_Crowd(nn.Module):
                         if ((x_coord >= 0) and (x_coord < samples.size()[2])) and (
                             (y_coord >= 0) and (y_coord < samples.size()[3])):
                             
-                            gt_heatmap[i, x_coord, y_coord] = gaussian_kernel[x, y]
+                            gt_heatmap[i, x_coord, y_coord] += gaussian_kernel[x, y]
 
         # calculate point proposals
         pred_logits = outputs["pred_logits"].clone().detach().cpu()
@@ -533,7 +533,7 @@ class SetCriterion_Crowd(nn.Module):
                         if ((x_coord >= 0) and (x_coord < samples.size()[2])) and (
                             (y_coord >= 0) and (y_coord < samples.size()[3])):
                             
-                            prop_heatmap[i, x_coord, y_coord] = gaussian_kernel[x, y]
+                            prop_heatmap[i, x_coord, y_coord] += gaussian_kernel[x, y]
     
         gt_heatmap = torch.Tensor(gt_heatmap)
         prop_heatmap = torch.Tensor(prop_heatmap)
