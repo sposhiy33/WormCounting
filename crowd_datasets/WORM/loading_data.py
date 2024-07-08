@@ -29,7 +29,7 @@ def loading_data(data_root, multiclass=False, hsv=False):
         hsv=hsv,
     )
     val_set = WORM(
-        data_root, train=False, patch=True, transform=transform, multiclass=multiclass, hsv=hsv
+        data_root, train=False, transform=transform, multiclass=multiclass, hsv=hsv
     )
     return train_set, val_set
 
