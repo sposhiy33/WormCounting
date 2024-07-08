@@ -9,6 +9,7 @@ import random
 import time
 import warnings
 from pathlib import Path
+import shutil
 
 import torch
 from tensorboardX import SummaryWriter
@@ -83,7 +84,7 @@ def main(args):
         "MULTICLASS": "dataroot/resize_multiclass",
         "L1": "dataroot/resize_L1",
         "ADULT": "dataroot/worm_dataset",
-        "MIXED": "dataroot/resize_mixed_l1_adult",
+        "MIXED": "dataroot/resize_mixed_eval",
     }
 
     for i, key in enumerate(list(dataset_list.keys())):
@@ -94,7 +95,12 @@ def main(args):
         val_set = loading_data(dataroot, multiclass=args.multiclass)
         # create the sampler used during training
         sampler_val = torch.utils.data.SequentialSampler(val_set)
-
+        
+        result_path = os.path.join(args.result_dir, f'{key}_vis')
+        if os.path.isdir(result_path):
+            shutil.rmtree(result_path)
+        os.mkdir(result_path)
+        
         data_loader_val = DataLoader(
             val_set,
             1,

@@ -87,6 +87,11 @@ def get_args_parser():
         type=float,
         help="weighted cross entropy loss coefficients",
     )
+
+    parser.add_argument(
+        "--dense_coef", default=1, type=float, help="relative weight of density loss"
+    )
+
     parser.add_argument(
         "--row", default=2, type=int, help="row number of anchor points"
     )
