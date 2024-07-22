@@ -66,7 +66,7 @@ def vis(samples, targets, pred, vis_dir, class_labels=None, des=None):
             if class_labels is not None:
                 if class_labels[i] == 0:
                     sample_pred = cv2.circle(
-                        sample_pred, (int(p[0]), int(p[1])), size, (225, 0, 255), -1
+                        sample_pred, (int(p[0]), int(p[1])), size, (0, 255, 0), -1
                     )
                 elif class_labels[i] == 1:
                     sample_pred = cv2.circle(
@@ -271,7 +271,7 @@ def evaluate_crowd_w_fine_grained(
         classification_score = torch.nn.functional.softmax(classification_score, -1)
         gt_cnt = targets[0]["point"].shape[0]
         # regression threshold
-        threshold = 0.55
+        threshold = 0.5
 
         # pick out point proposals
         points = (
@@ -352,7 +352,7 @@ def evaluate_crowd_no_overlap(
         target_labels = targets[0]["labels"].detach().numpy().tolist()
         gt_cnt = targets[0]["point"].shape[0]
         # 0.5 is used by default
-        threshold = 0.6
+        threshold = 0.5
 
         predict_cnt = 0
 

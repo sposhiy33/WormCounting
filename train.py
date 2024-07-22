@@ -122,12 +122,15 @@ def get_args_parser():
     parser.add_argument(
         "--multiclass",
         action="store_true",
-        help="boolean that decides whether class labels should be considered",
+        help="use mutliclass framework",
     )
     parser.add_argument(
         "--hsv",
         action="store_true",
-        help="boolean that decides whether to use hsv channels or not, if false, RGB is used",
+        help="use HSV channels during training",
+    )
+    parser.add_argument(
+        "--hse", action="store_true", help="use HSE channels during training"
     )
 
     parser.add_argument("--seed", default=42, type=int)
@@ -222,10 +225,11 @@ def main(args):
     # create the dataset
     loading_data = build_dataset(args=args)
     # create the training and valiation set
-    print(args.multiclass)
-    print(args.hsv)
+    print(f"Multiclass: {args.multiclass}")
+    print(f"HSV: {args.hsv}")
+    print(f"HSE: {args.hse}")
     train_set, val_set = loading_data(
-        args.data_root, multiclass=args.multiclass, hsv=args.hsv
+        args.data_root, multiclass=args.multiclass, hsv=args.hsv, hse=args.hse,
     )
     # create the sampler used during training
     sampler_train = torch.utils.data.RandomSampler(train_set)

@@ -24,6 +24,7 @@ class WORM(Dataset):
         flip=False,
         multiclass=False,
         hsv=False,
+        hse=False,
     ):
         self.root_path = data_root
 
@@ -66,6 +67,7 @@ class WORM(Dataset):
         self.flip = flip
         self.multiclass = multiclass
         self.hsv = hsv
+        self.hse = hse
 
     def __len__(self):
         return self.nSamples
@@ -116,6 +118,9 @@ class WORM(Dataset):
 
         if self.hsv:
             img = rgb_to_hsv(img)
+
+        if self.hse:
+            img = rgb_to_hse(img)
 
         if not self.train:
             if self.patch:
@@ -204,6 +209,39 @@ def rgb_to_hsv(rgb):
     hsv_v = cmax
     return torch.cat([hsv_h, hsv_s, hsv_v], dim=1)
 
+def rgb_to_hse(rgb):
+    """
+    Channels:
+        1. Hue
+        2. Saturation
+        3. Naive edge detection filter
+    """
+    # generate edges
+    # cv2.Canny() takes input of shape (H, W, channels)
+    # output as (H, W)
+    rgb_e = (rgb[0]*255).astype(np.uint8)
+    rgb_e = np.transpose(rgb_e, (1,2,0))
+    edge = cv2.Canny(rgb_e, 50, 150)
+    edge = torch.Tensor(edge)
+    # double unsqueeze to match output shape of H and S
+    edge = edge.unsqueeze(0).unsqueeze(0)
+    
+    # generate H and S
+    # require input of size (batch_size, channels, H, W) 
+    rgb = torch.Tensor(rgb)
+    cmax, cmax_idx = torch.max(rgb, dim=1, keepdim=True)
+    cmin = torch.min(rgb, dim=1, keepdim=True)[0]
+    delta = cmax - cmin
+    hsv_h = torch.empty_like(rgb[:, 0:1, :, :])
+    cmax_idx[delta == 0] = 3
+    hsv_h[cmax_idx == 0] = (((rgb[:, 1:2] - rgb[:, 2:3]) / delta) % 6)[cmax_idx == 0]
+    hsv_h[cmax_idx == 1] = (((rgb[:, 2:3] - rgb[:, 0:1]) / delta) + 2)[cmax_idx == 1]
+    hsv_h[cmax_idx == 2] = (((rgb[:, 0:1] - rgb[:, 1:2]) / delta) + 4)[cmax_idx == 2]
+    hsv_h[cmax_idx == 3] = 0.0
+    hsv_h /= 6.0
+    hsv_s = torch.where(cmax == 0, torch.tensor(0.0).type_as(rgb), delta / cmax)
+
+    return torch.cat([hsv_h, hsv_s, edge], dim=1)
 
 def random_rotate(img, den, labels, num_examples):
 
