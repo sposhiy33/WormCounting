@@ -219,12 +219,16 @@ def rgb_to_hse(rgb):
     # generate edges
     # cv2.Canny() takes input of shape (H, W, channels)
     # output as (H, W)
-    rgb_e = (rgb[0]*255).astype(np.uint8)
-    rgb_e = np.transpose(rgb_e, (1,2,0))
-    edge = cv2.Canny(rgb_e, 50, 150)
-    edge = torch.Tensor(edge)
+    edges = [] 
+    for i in range(rgb.shape[0]):
+        rgb_e = (rgb[0]*255).astype(np.uint8)
+        rgb_e = np.transpose(rgb_e, (1,2,0))
+        edge = cv2.Canny(rgb_e, 50, 150)
+        edge = torch.Tensor(edge)
+        edge = edge.unsqueeze(0).unsqueeze(0)
+        edges.append(edge)
     # double unsqueeze to match output shape of H and S
-    edge = edge.unsqueeze(0).unsqueeze(0)
+    edges = torch.cat(edges, dim=0)
     
     # generate H and S
     # require input of size (batch_size, channels, H, W) 
@@ -241,7 +245,7 @@ def rgb_to_hse(rgb):
     hsv_h /= 6.0
     hsv_s = torch.where(cmax == 0, torch.tensor(0.0).type_as(rgb), delta / cmax)
 
-    return torch.cat([hsv_h, hsv_s, edge], dim=1)
+    return torch.cat([hsv_h, hsv_s, edges], dim=1)
 
 def random_rotate(img, den, labels, num_examples):
 
