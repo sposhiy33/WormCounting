@@ -6,10 +6,10 @@ import argparse
 import datetime
 import os
 import random
+import shutil
 import time
 import warnings
 from pathlib import Path
-import shutil
 
 import torch
 from tensorboardX import SummaryWriter
@@ -43,6 +43,16 @@ def get_arg_parser():
         "--multiclass",
         action="store_true",
         help="framework to consider using the multiclass framwork or not",
+    )
+    parser.add_argument(
+        "--hsv",
+        action="store_true",
+        help="use Hue, Saturation, Value respectively for channels, by default RGB is used",
+    )
+    parser.add_argument(
+        "--hse",
+        action="store_true",
+        help="use Hue, Saturation, Edges respectively for channels, by default RGB is used",
     )
 
     ## throwaway args
@@ -92,15 +102,17 @@ def main(args):
         print(key)
         dataroot = dataset_list[key]
         # create the training and valiation set
-        val_set = loading_data(dataroot, multiclass=args.multiclass)
+        val_set = loading_data(
+            dataroot, multiclass=args.multiclass, hsv=args.hsv, hse=args.hse
+        )
         # create the sampler used during training
         sampler_val = torch.utils.data.SequentialSampler(val_set)
-        
-        result_path = os.path.join(args.result_dir, f'{key}_vis')
+
+        result_path = os.path.join(args.result_dir, f"{key}_vis")
         if os.path.isdir(result_path):
             shutil.rmtree(result_path)
         os.mkdir(result_path)
-        
+
         data_loader_val = DataLoader(
             val_set,
             1,
