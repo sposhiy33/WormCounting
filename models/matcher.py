@@ -62,7 +62,7 @@ class HungarianMatcher_Crowd(nn.Module):
         tgt_points = torch.cat([v["point"] for v in targets])
         
         if self.override_multiclass:
-            torch.ones(tgt_ids.size()[0], dtype=torch.int)
+            tgt_ids = torch.ones(tgt_ids.size()[0], dtype=torch.int)
         # Compute the classification cost. Contrary to the loss, we don't use the NLL,
         # but approximate it in 1 - proba[target class].
         # The 1 is a constant that doesn't change the matching, it can be ommitted.
