@@ -93,10 +93,10 @@ def get_args_parser():
     )
 
     parser.add_argument(
-        "--row", default=2, type=int, help="row number of anchor points"
+        "--row", default=3, type=int, help="row number of anchor points"
     )
     parser.add_argument(
-        "--line", default=2, type=int, help="line number of anchor points"
+        "--line", default=3, type=int, help="line number of anchor points"
     )
 
     # dataset parameters

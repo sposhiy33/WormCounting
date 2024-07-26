@@ -103,6 +103,8 @@ class WORM(Dataset):
             # convert point arrays for each image to torch Tensor type
             for i, _ in enumerate(point):
                 point[i] = torch.Tensor(point[i])
+        else:
+            img = img.detach().numpy()
 
         # a rotation augmentation applied at the patch level
         if self.train and self.rotate:
@@ -120,6 +122,8 @@ class WORM(Dataset):
             img = rgb_to_hsv(img)
 
         if self.hse:
+            try: img = img.detach().numpy()
+            except: pass
             img = rgb_to_hse(img)
 
         if not self.train:
@@ -193,7 +197,6 @@ def rgb_to_hsv(rgb):
     Parameters:
     img --> torch.Tensor of shape
     """
-    print("HSV")
     rgb = torch.Tensor(rgb)
     cmax, cmax_idx = torch.max(rgb, dim=1, keepdim=True)
     cmin = torch.min(rgb, dim=1, keepdim=True)[0]
@@ -219,9 +222,10 @@ def rgb_to_hse(rgb):
     # generate edges
     # cv2.Canny() takes input of shape (H, W, channels)
     # output as (H, W)
-    edges = [] 
+    edges = []
+    if len(rgb.shape) <= 3: rgb = np.expand_dims(rgb, axis=0)
     for i in range(rgb.shape[0]):
-        rgb_e = (rgb[0]*255).astype(np.uint8)
+        rgb_e = (rgb[i]*255).astype(np.uint8)
         rgb_e = np.transpose(rgb_e, (1,2,0))
         edge = cv2.Canny(rgb_e, 50, 150)
         edge = torch.Tensor(edge)

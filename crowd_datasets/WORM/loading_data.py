@@ -30,12 +30,12 @@ def loading_data(data_root, multiclass=False, hsv=False, hse=False):
         hse=hse,
     )
     val_set = WORM(
-        data_root, train=False, transform=transform, multiclass=multiclass,
+        data_root, train=False, transform=transform, multiclass=multiclass, hsv=hsv, hse=hse
     )
     return train_set, val_set
 
 
-def loading_data_val(data_root, multiclass=False, hsv=False):
+def loading_data_val(data_root, multiclass=False, hsv=False, hse=False):
 
     # the pre-proccssing transform
     transform = standard_transforms.Compose(
@@ -48,7 +48,7 @@ def loading_data_val(data_root, multiclass=False, hsv=False):
     )
 
     val_set = WORM(
-        data_root, train=False, transform=transform, multiclass=multiclass, hsv=hsv
+        data_root, train=False, transform=transform, multiclass=multiclass, hsv=hsv, hse=hse
     )
 
     return val_set
