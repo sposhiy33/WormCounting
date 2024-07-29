@@ -43,7 +43,7 @@ def get_arg_parser():
         "--multiclass",
         action="store_true",
         help="framework to consider using the multiclass framwork or not",
-    )
+   )
     parser.add_argument(
         "--hsv",
         action="store_true",

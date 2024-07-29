@@ -1,10 +1,10 @@
 import torch
 import torchvision.transforms as standard_transforms
 
-from .WORM import WORM
+from WORM import WORM
 
 
-def loading_data(data_root, multiclass=False, hsv=False, hse=False):
+def loading_data(data_root, multiclass=False, hsv=False, hse=False, edges=False):
 
     # the pre-proccssing transform
     transform = standard_transforms.Compose(
@@ -28,14 +28,21 @@ def loading_data(data_root, multiclass=False, hsv=False, hse=False):
         multiclass=multiclass,
         hsv=hsv,
         hse=hse,
+        edges=edges,
     )
     val_set = WORM(
-        data_root, train=False, transform=transform, multiclass=multiclass, hsv=hsv, hse=hse
+        data_root,
+        train=False,
+        transform=transform,
+        multiclass=multiclass,
+        hsv=hsv,
+        hse=hse,
+        edges=edges,
     )
     return train_set, val_set
 
 
-def loading_data_val(data_root, multiclass=False, hsv=False, hse=False):
+def loading_data_val(data_root, multiclass=False, hsv=False, hse=False, edges=False):
 
     # the pre-proccssing transform
     transform = standard_transforms.Compose(
@@ -48,13 +55,18 @@ def loading_data_val(data_root, multiclass=False, hsv=False, hse=False):
     )
 
     val_set = WORM(
-        data_root, train=False, transform=transform, multiclass=multiclass, hsv=hsv, hse=hse
+        data_root,
+        train=False,
+        transform=transform,
+        multiclass=multiclass,
+        hsv=hsv,
+        hse=hse,
     )
 
     return val_set
 
 
-def load_viz_data(data_root, multiclass=False):
+def load_viz_data(data_root, multiclass=False, hsv=False, hse=False, edges=True):
 
     # transform to tensor
     transform = standard_transforms.ToTensor()
@@ -64,11 +76,22 @@ def load_viz_data(data_root, multiclass=False):
         train=True,
         transform=transform,
         patch=True,
-        rotate=True,
-        scale=True,
+        rotate=False,
+        scale=False,
         flip=False,
         multiclass=multiclass,
+        hsv=hsv,
+        hse=hse,
+        edges=edges,
     )
-    val_set = WORM(data_root, train=False, transform=transform, multiclass=multiclass)
+    val_set = WORM(
+        data_root,
+        train=False,
+        transform=transform,
+        multiclass=multiclass,
+        hsv=hsv,
+        hse=hse,
+        edges=edges,
+    )
 
     return train_set, val_set

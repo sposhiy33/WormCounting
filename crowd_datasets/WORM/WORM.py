@@ -8,6 +8,7 @@ import numpy as np
 import scipy.io as io
 import torch
 import torchvision
+import torchvision.transforms.functional as F
 from PIL import Image
 from torch.utils.data import Dataset
 
@@ -25,6 +26,7 @@ class WORM(Dataset):
         multiclass=False,
         hsv=False,
         hse=False,
+        edges=False,
     ):
         self.root_path = data_root
 
@@ -68,6 +70,7 @@ class WORM(Dataset):
         self.multiclass = multiclass
         self.hsv = hsv
         self.hse = hse
+        self.edges = edges
 
     def __len__(self):
         return self.nSamples
@@ -79,6 +82,10 @@ class WORM(Dataset):
         gt_path = self.img_map[img_path]
         # load image and ground truth
         img, point, labels = load_data((img_path, gt_path), self.train, self.multiclass)
+
+        if self.edges:
+            img = edges(img)
+
         # apply augumentation
         if self.transform is not None:
             img = self.transform(img)
@@ -122,8 +129,10 @@ class WORM(Dataset):
             img = rgb_to_hsv(img)
 
         if self.hse:
-            try: img = img.detach().numpy()
-            except: pass
+            try:
+                img = img.detach().numpy()
+            except:
+                pass
             img = rgb_to_hse(img)
 
         if not self.train:
@@ -212,6 +221,7 @@ def rgb_to_hsv(rgb):
     hsv_v = cmax
     return torch.cat([hsv_h, hsv_s, hsv_v], dim=1)
 
+
 def rgb_to_hse(rgb):
     """
     Channels:
@@ -223,19 +233,20 @@ def rgb_to_hse(rgb):
     # cv2.Canny() takes input of shape (H, W, channels)
     # output as (H, W)
     edges = []
-    if len(rgb.shape) <= 3: rgb = np.expand_dims(rgb, axis=0)
+    if len(rgb.shape) <= 3:
+        rgb = np.expand_dims(rgb, axis=0)
     for i in range(rgb.shape[0]):
-        rgb_e = (rgb[i]*255).astype(np.uint8)
-        rgb_e = np.transpose(rgb_e, (1,2,0))
+        rgb_e = (rgb[i] * 255).astype(np.uint8)
+        rgb_e = np.transpose(rgb_e, (1, 2, 0))
         edge = cv2.Canny(rgb_e, 50, 150)
         edge = torch.Tensor(edge)
         edge = edge.unsqueeze(0).unsqueeze(0)
         edges.append(edge)
     # double unsqueeze to match output shape of H and S
     edges = torch.cat(edges, dim=0)
-    
+
     # generate H and S
-    # require input of size (batch_size, channels, H, W) 
+    # require input of size (batch_size, channels, H, W)
     rgb = torch.Tensor(rgb)
     cmax, cmax_idx = torch.max(rgb, dim=1, keepdim=True)
     cmin = torch.min(rgb, dim=1, keepdim=True)[0]
@@ -250,6 +261,127 @@ def rgb_to_hse(rgb):
     hsv_s = torch.where(cmax == 0, torch.tensor(0.0).type_as(rgb), delta / cmax)
 
     return torch.cat([hsv_h, hsv_s, edges], dim=1)
+
+
+def edges(rgb):
+    blurSize = 10
+    mCannyMin = 70
+    mCannyMax = 100
+    mCircRadMin = 200
+    mCircRadMax = 500
+    radiusDecrease = 30
+    circleOffset = -5
+
+    clipLimit = 2.0
+    tileGridSize = (8, 8)
+    wCannyMin = 30
+    wCannyMax = 120
+    erosionK = 2
+    dilationK = 2
+    resizeWorm = False
+
+    # PIL to numpy
+    img_tensor = F.pil_to_tensor(rgb)
+    rgb = img_tensor.detach().numpy()
+    # convert to [0,255] range from PIL range
+    image = (rgb * 255).astype(np.uint8)
+    # change to H,W,C as needed by OpenCV
+    image = np.transpose(image, (1, 2, 0))
+    # generate masks
+    petriMask = get_petri_mask(
+        image,
+        blurSize,
+        mCannyMin,
+        mCannyMax,
+        mCircRadMin,
+        mCircRadMax,
+        radiusDecrease,
+        circleOffset,
+    )
+    wormMask = get_worm_mask(
+        image,
+        tileGridSize,
+        clipLimit,
+        wCannyMin,
+        wCannyMax,
+        erosionK,
+        dilationK,
+        resizeWorm,
+    )
+    result = cv2.bitwise_and(petriMask, wormMask)
+    # convert result to three color channels from one
+    result = cv2.cvtColor(result, cv2.COLOR_GRAY2RGB)
+    result = Image.fromarray(result)
+    return result
+
+
+def get_petri_mask(
+    image,
+    blurSize,
+    mCannyMin,
+    mCannyMax,
+    circRadMin,
+    circRadMax,
+    radiusDecrease,
+    circleOffset,
+):
+    grayImage = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    grayImage = clahe.apply(grayImage)
+    grayImage = cv2.blur(grayImage, (blurSize, blurSize))
+    edges = cv2.Canny(grayImage, mCannyMin, mCannyMax)
+    detected_circles = cv2.HoughCircles(
+        edges,
+        cv2.HOUGH_GRADIENT,
+        1,
+        20,
+        param1=50,
+        param2=30,
+        minRadius=circRadMin,
+        maxRadius=circRadMax,
+    )
+    if detected_circles is not None:
+        # Convert the circle parameters a, b and r to integers.
+        detected_circles = np.uint16(np.around(detected_circles))
+        pt = detected_circles[0, 0, :]
+        a, b, r = pt[0], pt[1], pt[2]
+        mask = np.zeros_like(grayImage)
+        mask = cv2.circle(
+            mask,
+            (a - circleOffset, b - circleOffset),
+            r - radiusDecrease,
+            (255, 255, 255),
+            -1,
+        )
+        return mask
+
+
+def get_worm_mask(
+    image,
+    tileGridSize,
+    clipLimit,
+    wCannyMin,
+    wCannyMax,
+    erosionK,
+    dilationK,
+    resizeWorm,
+):
+    grayImage = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    grayImage = clahe.apply(grayImage)
+    # gray_image = cv2.blur(gray_image, (2, 2))
+    edges = cv2.Canny(grayImage, 100, 160)
+    wormMask = None
+    if resizeWorm:
+        kernel_dilation = np.ones((4, 4), np.uint8)
+        img_dilation = cv2.dilate(edges, kernel_dilation, iterations=1)
+        kernel_erosion = np.ones((2, 2), np.uint8)
+        img_erosion = cv2.erode(img_dilation, kernel_erosion, iterations=1)
+        wormMask = img_erosion
+    else:
+        wormMask = edges
+    return wormMask
+
 
 def random_rotate(img, den, labels, num_examples):
 
