@@ -419,7 +419,7 @@ def random_rotate(img, den, labels, num_examples):
     return result_img, result_den, result_labels
 
 
-def equal_crop(img, den, labels, num_patches: int = 4):
+def equal_crop(img, den, labels, num_patches: int = 1):
 
     img = img.detach().numpy()
     img_size = img.shape

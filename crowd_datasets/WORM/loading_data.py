@@ -1,7 +1,7 @@
 import torch
 import torchvision.transforms as standard_transforms
 
-from WORM import WORM
+from .WORM import WORM
 
 
 def loading_data(data_root, multiclass=False, hsv=False, hse=False, edges=False):

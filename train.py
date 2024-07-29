@@ -132,6 +132,9 @@ def get_args_parser():
     parser.add_argument(
         "--hse", action="store_true", help="use HSE channels during training"
     )
+    parser.add_argument(
+        "--edges", action="store_true", help="use Canny edge output during training"
+    )
 
     parser.add_argument("--seed", default=42, type=int)
     parser.add_argument("--resume", default="", help="resume from checkpoint")
@@ -228,8 +231,10 @@ def main(args):
     print(f"Multiclass: {args.multiclass}")
     print(f"HSV: {args.hsv}")
     print(f"HSE: {args.hse}")
+    print(f"Edges: {args.edges}")
     train_set, val_set = loading_data(
         args.data_root, multiclass=args.multiclass, hsv=args.hsv, hse=args.hse,
+        edges=args.edges,
     )
     # create the sampler used during training
     sampler_train = torch.utils.data.RandomSampler(train_set)
