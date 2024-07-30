@@ -24,6 +24,7 @@ class WORM(Dataset):
         patch=False,
         flip=False,
         multiclass=False,
+        class_filter=None,
         hsv=False,
         hse=False,
         edges=False,
@@ -68,6 +69,7 @@ class WORM(Dataset):
         self.scale = scale
         self.flip = flip
         self.multiclass = multiclass
+        self.class_filter = class_filter
         self.hsv = hsv
         self.hse = hse
         self.edges = edges
@@ -81,7 +83,9 @@ class WORM(Dataset):
         img_path = self.img_list[index]
         gt_path = self.img_map[img_path]
         # load image and ground truth
-        img, point, labels = load_data((img_path, gt_path), self.train, self.multiclass)
+        img, point, labels = load_data(
+            (img_path, gt_path), self.train, self.multiclass, self.class_filter
+        )
 
         if self.edges:
             img = edges(img)
@@ -155,7 +159,7 @@ class WORM(Dataset):
         return img, target
 
 
-def load_data(img_gt_path, train, multiclass):
+def load_data(img_gt_path, train, multiclass, class_filter):
     img_path, gt_path = img_gt_path
     # load the images
     img = cv2.imread(img_path)
@@ -165,7 +169,6 @@ def load_data(img_gt_path, train, multiclass):
 
     # assign a class
     labels = []
-
     with open(gt_path) as f_label:
         for line in f_label:
             if "\t" in line:
@@ -197,6 +200,16 @@ def load_data(img_gt_path, train, multiclass):
                 y = float(line.strip().split(" ")[1])
                 labels.append(2)
                 points.append([x, y])
+
+    if class_filter != None:
+
+        class_filter_mask = []
+        for i in labels:
+            if i == class_filter: class_filter_mask.append(True)
+            else: class_filter_mask.append(False)
+        labels = [i for keep, i in zip(class_filter_mask, labels) if keep]
+        points = [i for keep, i in zip(class_filter_mask, points) if keep]
+
     return img, np.array(points), np.array(labels)
 
 
@@ -465,7 +478,7 @@ def equal_crop(img, den, labels, num_patches: int = 1):
 
 
 # random crop augumentation
-def random_crop(img, den, labels, num_patch: int = 4):
+def random_crop(img, den, labels, num_patch: int = 1):
 
     half_h = 512
     half_w = 512

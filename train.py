@@ -125,6 +125,13 @@ def get_args_parser():
         help="use mutliclass framework",
     )
     parser.add_argument(
+        "--class_filter",
+        type=int,
+        default=None,
+        help="train on only the specified class index",
+    )
+
+    parser.add_argument(
         "--hsv",
         action="store_true",
         help="use HSV channels during training",
@@ -233,7 +240,11 @@ def main(args):
     print(f"HSE: {args.hse}")
     print(f"Edges: {args.edges}")
     train_set, val_set = loading_data(
-        args.data_root, multiclass=args.multiclass, hsv=args.hsv, hse=args.hse,
+        args.data_root,
+        multiclass=args.multiclass,
+        class_filter=args.class_filter,
+        hsv=args.hsv,
+        hse=args.hse,
         edges=args.edges,
     )
     # create the sampler used during training

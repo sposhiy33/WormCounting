@@ -4,7 +4,9 @@ import torchvision.transforms as standard_transforms
 from .WORM import WORM
 
 
-def loading_data(data_root, multiclass=False, hsv=False, hse=False, edges=False):
+def loading_data(
+    data_root, multiclass=False, class_filter=None, hsv=False, hse=False, edges=False
+):
 
     # the pre-proccssing transform
     transform = standard_transforms.Compose(
@@ -26,6 +28,7 @@ def loading_data(data_root, multiclass=False, hsv=False, hse=False, edges=False)
         scale=False,
         flip=False,
         multiclass=multiclass,
+        class_filter=class_filter,
         hsv=hsv,
         hse=hse,
         edges=edges,
@@ -35,6 +38,7 @@ def loading_data(data_root, multiclass=False, hsv=False, hse=False, edges=False)
         train=False,
         transform=transform,
         multiclass=multiclass,
+        class_filter=class_filter,
         hsv=hsv,
         hse=hse,
         edges=edges,

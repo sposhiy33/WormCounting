@@ -67,7 +67,6 @@ class HungarianMatcher_Crowd(nn.Module):
         # but approximate it in 1 - proba[target class].
         # The 1 is a constant that doesn't change the matching, it can be ommitted.
         cost_class = -out_prob[:, tgt_ids]
-
         # Compute the L2 cost between point
         cost_point = torch.cdist(out_points, tgt_points, p=2)
 
