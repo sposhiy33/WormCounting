@@ -22,6 +22,7 @@ class WORM(Dataset):
         scale=False,
         rotate=False,
         patch=False,
+        equal_crop=False,
         flip=False,
         multiclass=False,
         class_filter=None,
@@ -69,6 +70,7 @@ class WORM(Dataset):
         self.scale = scale
         self.flip = flip
         self.multiclass = multiclass
+        self.equal_crop = equal_crop
         self.class_filter = class_filter
         self.hsv = hsv
         self.hse = hse
@@ -107,15 +109,19 @@ class WORM(Dataset):
                 ).squeeze(0)
                 point *= scale
 
-        # random crop augumentaiton
+        # crop augumentaiton
         if self.train and self.patch:
             img, point, labels = random_crop(img, point, labels)
 
             # convert point arrays for each image to torch Tensor type
             for i, _ in enumerate(point):
                 point[i] = torch.Tensor(point[i])
+        elif self.equal_crop:
+            img, point, labels = equal_crop(img,point,labels)
         else:
             img = img.detach().numpy()
+            point = [point]
+            labels = [labels]
 
         # a rotation augmentation applied at the patch level
         if self.train and self.rotate:
@@ -133,18 +139,10 @@ class WORM(Dataset):
             img = rgb_to_hsv(img)
 
         if self.hse:
-            try:
-                img = img.detach().numpy()
-            except:
-                pass
+            try: img = img.detach().numpy()
+            except: print("img is already a numpy array")
             img = rgb_to_hse(img)
 
-        if not self.train:
-            if self.patch:
-                img, point, labels = equal_crop(img, point, labels)
-            else:
-                point = [point]
-                labels = [labels]
 
         img = torch.Tensor(img)
         # pack up related infos
@@ -278,7 +276,7 @@ def rgb_to_hse(rgb):
 
 def edges(rgb):
     blurSize = 10
-    mCannyMin = 70
+    mCannyMin = 40
     mCannyMax = 100
     mCircRadMin = 200
     mCircRadMax = 500
@@ -432,13 +430,13 @@ def random_rotate(img, den, labels, num_examples):
     return result_img, result_den, result_labels
 
 
-def equal_crop(img, den, labels, num_patches: int = 1):
+def equal_crop(img, den, labels, num_patches: int = 4):
 
     img = img.detach().numpy()
     img_size = img.shape
     # make sure that num_patches is a perfect square
     assert math.isqrt(num_patches) ** 2 == num_patches
-    partition = math.isqrt(num_patches)
+    partition = int(math.isqrt(num_patches))
     img_w = img_size[2] // partition
     img_h = img_size[1] // partition
     result_img = np.zeros([num_patches, img_size[0], img_h, img_w])
@@ -468,7 +466,7 @@ def equal_crop(img, den, labels, num_patches: int = 1):
         record_den = den[idx]
         record_den[:, 0] -= start_w
         record_den[:, 1] -= start_h
-
+        
         record_lab = labels[idx]
 
         result_den.append(record_den)
@@ -478,13 +476,15 @@ def equal_crop(img, den, labels, num_patches: int = 1):
 
 
 # random crop augumentation
-def random_crop(img, den, labels, num_patch: int = 1):
+def random_crop(img, den, labels, edge_image = None, num_patch: int = 2):
 
     half_h = 512
     half_w = 512
     # half_h = img.size()[1]//4
     # half_w = img.size()[2]//4
-    result_img = np.zeros([num_patch, img.shape[0], half_h, half_w])
+    if edge_image == None:
+        result_img = np.zeros([num_patch, img.shape[0], half_h, half_w])
+    else: result_img = np.zeros([num_patch*2, img.shape[0], half_h, half_w]) 
     result_den = []
     result_lab = []
     # crop num_patch for each image
@@ -505,6 +505,7 @@ def random_crop(img, den, labels, num_patch: int = 1):
         # shift the corrdinates
         record_den = den[idx]
         record_lab = labels[idx]
+        # gaurentee that each patch sample has point in it 
         if len(record_den) > 0:
             # copy the cropped rect
             result_img[current_count] = img[:, start_h:end_h, start_w:end_w]

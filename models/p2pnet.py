@@ -606,7 +606,7 @@ def build_p2p(args, training):
     if not training:
         return model
 
-    weight_dict = {"loss_ce": 1, "loss_points": args.point_loss_coef, "loss_dense": 1}
+    weight_dict = {"loss_ce": 1, "loss_point": args.point_loss_coef, "loss_dense": 1}
     losses = ["labels", "points"]
     matcher = build_matcher_crowd(args)
     criterion = SetCriterion_Crowd(

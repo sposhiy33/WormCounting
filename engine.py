@@ -36,7 +36,7 @@ def vis(samples, targets, pred, vis_dir, class_labels=None, des=None):
     pred -> list: [num_preds, 2]
     class_labels -> list: [num_preds] -- predicited class of each predicted point
     """
-    gts = [t["point"].tolist() for t in targets]
+    gts = [targets["point"].tolist()]
 
     pil_to_tensor = standard_transforms.ToTensor()
 
@@ -83,7 +83,7 @@ def vis(samples, targets, pred, vis_dir, class_labels=None, des=None):
                     sample_pred, (int(p[0]), int(p[1])), size, (0, 0, 255), -1
                 )
 
-        name = targets[idx]["image_id"]
+        name = targets["image_id"]
         # save the visualized images
         if des is not None:
             cv2.imwrite(
@@ -194,7 +194,11 @@ def train_one_epoch(
         losses = sum(
             loss_dict[k] * weight_dict[k] for k in loss_dict.keys() if k in weight_dict
         )
-
+        
+        # print(f"loss dict: {loss_dict}")
+        # print(f"weight dict: {weight_dict}")
+        # print(f"Losses: {losses}")
+        
         # reduce all losses
         loss_dict_reduced = utils.reduce_dict(loss_dict)
         loss_dict_reduced_unscaled = {
@@ -339,72 +343,75 @@ def evaluate_crowd_no_overlap(
     count = []
     gt_count = []
 
-    for samples, targets in data_loader:
-        samples = samples.to(device)
+    for batch, batch_targets in data_loader:
+        for samples, targets in zip(batch, batch_targets): 
+            samples = samples.to(device)
+            samples = samples.unsqueeze(0)
+            # print(f"Samples: {samples.size()}")
+            outputs = model(samples)
+            # print(f"Pred Points: {outputs["pred_points"].size()}")
+            # print(f"Pred Logits: {outputs["pred_logits"].size()}")
+            # logits and class_labels of point proposals, to be populated
+            points = []
+            class_labels = []
 
-        outputs = model(samples)
+            outputs_points = outputs["pred_points"][0]
+            target_labels = targets["labels"].detach().numpy().tolist()
+            gt_cnt = targets["point"].shape[0]
+            # 0.5 is used by default
+            threshold = 0.5
 
-        # logits and class_labels of point proposals, to be populated
-        points = []
-        class_labels = []
+            predict_cnt = 0
 
-        outputs_points = outputs["pred_points"][0]
-        target_labels = targets[0]["labels"].detach().numpy().tolist()
-        gt_cnt = targets[0]["point"].shape[0]
-        # 0.5 is used by default
-        threshold = 0.5
-
-        predict_cnt = 0
-
-        if multiclass:
-            # iterate over each of the classes
-            target_count = []
-            proposal_count = []
-            for i in range(num_classes):
-                class_idx = i + 1
-                outputs_scores = torch.nn.functional.softmax(
-                    outputs["pred_logits"], -1)[:, :, class_idx][0]
-                prop_points = (
+            if multiclass:
+                # iterate over each of the classes
+                target_count = []
+                proposal_count = []
+                for i in range(num_classes):
+                    class_idx = i + 1
+                    outputs_scores = torch.nn.functional.softmax(
+                        outputs["pred_logits"], -1)[:, :, class_idx][0]
+                    prop_points = (
+                        outputs_points[outputs_scores > threshold]
+                        .detach()
+                        .cpu()
+                        .numpy()
+                        .tolist()
+                    )
+                    for p in prop_points:
+                        points.append(p)
+                        class_labels.append(class_idx)
+                    cnt = int((outputs_scores > threshold).sum())
+                    predict_cnt += cnt
+                    proposal_count.append(cnt)
+                    target_count.append(len([i for i in target_labels if i == class_idx]))
+                count.append(proposal_count)
+                gt_count.append(target_count)
+            else:
+                outputs_scores = torch.nn.functional.softmax(outputs["pred_logits"], -1)[:, :, 1][0]
+                points = (
                     outputs_points[outputs_scores > threshold]
                     .detach()
                     .cpu()
                     .numpy()
                     .tolist()
                 )
-                for p in prop_points:
-                    points.append(p)
-                    class_labels.append(class_idx)
-                cnt = int((outputs_scores > threshold).sum())
+                cnt = len(points)
                 predict_cnt += cnt
-                proposal_count.append(cnt)
-                target_count.append(len([i for i in target_labels if i == class_idx]))
-            count.append(proposal_count)
-            gt_count.append(target_count)
-        else:
-            outputs_scores = torch.nn.functional.softmax(outputs["pred_logits"], -1)[:, :, 1][0]
-            points = (
-                outputs_points[outputs_scores > threshold]
-                .detach()
-                .cpu()
-                .numpy()
-                .tolist()
-            )
-            cnt = len(points)
-            predict_cnt += cnt
-            gt_count.append([len(target_labels)])
-            count.append([cnt])
+                gt_count.append([len(target_labels)])
+                count.append([cnt])
 
-        # if specified, save the visualized images
-        if vis_dir is not None:
-            if multiclass:
-                vis(samples, targets, [points], vis_dir, class_labels)
-            else:
-                vis(samples, targets, [points], vis_dir)
-        # accumulate MAE, MSE
-        mae = abs(predict_cnt - gt_cnt)
-        mse = (predict_cnt - gt_cnt) * (predict_cnt - gt_cnt)
-        maes.append(float(mae))
-        mses.append(float(mse))
+            # if specified, save the visualized images
+            if vis_dir is not None:
+                if multiclass:
+                    vis(samples, targets, [points], vis_dir, class_labels)
+                else:
+                    vis(samples, targets, [points], vis_dir)
+            # accumulate MAE, MSE
+            mae = abs(predict_cnt - gt_cnt)
+            mse = (predict_cnt - gt_cnt) * (predict_cnt - gt_cnt)
+            maes.append(float(mae))
+            mses.append(float(mse))
     # calc MAE, MSE
     mae = np.mean(maes)
     mse = np.sqrt(np.mean(mses))

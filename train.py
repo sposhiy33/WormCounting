@@ -72,8 +72,8 @@ def get_args_parser():
         help="L1 point coefficient in the matching cost",
     )
 
-    # * Loss coefficients
-    parser.add_argument("--point_loss_coef", default=0.0002, type=float)
+    # * Loss coefficients (guide training scheme)
+    parser.add_argument("--point_loss_coef", default=0.5, type=float)
 
     parser.add_argument(
         "--eos_coef",
@@ -85,7 +85,7 @@ def get_args_parser():
         "--ce_coef",
         nargs="+",
         type=float,
-        help="weighted cross entropy loss coefficients",
+        help="Classification weights of each object class, n # of args for n # of classes",
     )
 
     parser.add_argument(
@@ -293,6 +293,7 @@ def main(args):
     # save the performance during the training
     mae = []
     mse = []
+    loss = []
     # the logger writer
     writer = SummaryWriter(tb_path)
 
@@ -315,9 +316,10 @@ def main(args):
             with open(run_log_name, "a") as log_file:
                 log_file.write("loss/loss@{}: {}".format(epoch, stat["loss"]))
                 log_file.write("loss/loss_ce@{}: {}".format(epoch, stat["loss_ce"]))
-
+                log_file.write("loss/loss_point@{}: {}". format(epoch, stat["loss_point"]))
             writer.add_scalar("loss/loss", stat["loss"], epoch)
             writer.add_scalar("loss/loss_ce", stat["loss_ce"], epoch)
+            writer.add_scalar("loss/loss_point", stat["loss_point"], epoch)
         t2 = time.time()
         print(
             "[ep %d][lr %.7f][%.2fs]"
@@ -385,7 +387,7 @@ def main(args):
                 writer.add_scalar("metric/mse", result[1], step)
                 step += 1
 
-            # save the best model since begining
+            # save the best model with best average count error
             if abs(np.min(mae) - result[0]) < 0.01:
                 checkpoint_best_path = os.path.join(weight_path, "best_mae.pth")
                 torch.save(
@@ -394,6 +396,8 @@ def main(args):
                     },
                     checkpoint_best_path,
                 )
+            
+            # save model with the lowest training loss
     # total time for training
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))

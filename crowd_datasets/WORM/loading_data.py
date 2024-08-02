@@ -5,7 +5,13 @@ from .WORM import WORM
 
 
 def loading_data(
-    data_root, multiclass=False, class_filter=None, hsv=False, hse=False, edges=False
+    data_root,
+    multiclass=False,
+    equal_crop=False,
+    class_filter=None,
+    hsv=False,
+    hse=False,
+    edges=False,
 ):
 
     # the pre-proccssing transform
@@ -46,7 +52,15 @@ def loading_data(
     return train_set, val_set
 
 
-def loading_data_val(data_root, multiclass=False, hsv=False, hse=False, edges=False):
+def loading_data_val(
+    data_root,
+    multiclass=False,
+    equal_crop=False,
+    hsv=False,
+    hse=False,
+    edges=False,
+    class_filter=None,
+):
 
     # the pre-proccssing transform
     transform = standard_transforms.Compose(
@@ -63,8 +77,11 @@ def loading_data_val(data_root, multiclass=False, hsv=False, hse=False, edges=Fa
         train=False,
         transform=transform,
         multiclass=multiclass,
+        equal_crop=equal_crop,
         hsv=hsv,
         hse=hse,
+        edges=edges,
+        class_filter=class_filter,
     )
 
     return val_set

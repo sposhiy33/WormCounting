@@ -43,7 +43,13 @@ def get_arg_parser():
         "--multiclass",
         action="store_true",
         help="framework to consider using the multiclass framwork or not",
-   )
+    )
+    parser.add_argument(
+        "--class_filter",
+        type=int,
+        default=None,
+        help="train on only the specified class index",
+    )
     parser.add_argument(
         "--hsv",
         action="store_true",
@@ -54,7 +60,14 @@ def get_arg_parser():
         action="store_true",
         help="use Hue, Saturation, Edges respectively for channels, by default RGB is used",
     )
-
+    parser.add_argument(
+        "--edges", action="store_true", help="use edge detection photos"
+    )
+    parser.add_argument(
+        "--equal_crop",
+        action="store_true",
+        help="equally partition the image (for test time)",
+    )
     ## throwaway args
     parser.add_argument("--batch_size", default=8, type=int)
     parser.add_argument("--num_workers", default=8, type=int)
@@ -103,15 +116,23 @@ def main(args):
         dataroot = dataset_list[key]
         # create the training and valiation set
         val_set = loading_data(
-            dataroot, multiclass=args.multiclass, hsv=args.hsv, hse=args.hse
+            dataroot,
+            multiclass=args.multiclass,
+            equal_crop=args.equal_crop,
+            hsv=args.hsv,
+            hse=args.hse,
+            edges=args.edges,
+            class_filter=args.class_filter,
         )
         # create the sampler used during training
         sampler_val = torch.utils.data.SequentialSampler(val_set)
 
-        result_path = os.path.join(args.result_dir, f"{key}_vis")
-        if os.path.isdir(result_path):
-            shutil.rmtree(result_path)
-        os.mkdir(result_path)
+        result_path = None
+        if args.result_dir != None:
+            result_path = os.path.join(args.result_dir, f"{key}_vis")
+            if os.path.isdir(result_path):
+                shutil.rmtree(result_path)
+            os.mkdir(result_path)
 
         data_loader_val = DataLoader(
             val_set,
@@ -125,7 +146,7 @@ def main(args):
             model,
             data_loader_val,
             device,
-            os.path.join(args.result_dir, f"{key}_vis"),
+            vis_dir=result_path,
             multiclass=args.multiclass,
             num_classes=args.num_classes,
         )
