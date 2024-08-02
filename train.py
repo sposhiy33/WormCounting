@@ -294,6 +294,7 @@ def main(args):
     mae = []
     mse = []
     loss = []
+    min_loss = 100.0
     # the logger writer
     writer = SummaryWriter(tb_path)
 
@@ -310,7 +311,8 @@ def main(args):
             epoch,
             args.clip_max_norm,
         )
-
+   
+        loss.append(stat["loss"])
         # record the training states after every epoch
         if writer is not None:
             with open(run_log_name, "a") as log_file:
@@ -340,6 +342,19 @@ def main(args):
             },
             checkpoint_latest_path,
         )
+        
+        
+        # save model with the lowest training loss
+        if min_loss > stat["loss"]:
+            checkpoint_best_path = os.path.join(weight_path, "best_training_loss.pth")
+            torch.save(
+                {
+                    "model": model_without_ddp.state_dict(),
+                },
+                checkpoint_best_path,
+            )
+            # update min loss
+            min_loss = np.min(loss)
 
         # run classwise loss evaluation
         avg_class = avg_class_loss(class_stat, writer, epoch)
@@ -397,7 +412,7 @@ def main(args):
                     checkpoint_best_path,
                 )
             
-            # save model with the lowest training loss
+
     # total time for training
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
