@@ -5,10 +5,10 @@ UDA_VISIBLE_DEVICES=0 python train.py --expname $1 --data_root $2 \
     --output_dir ./results/ \
     --lr 0.0001 \
     --lr_backbone 0.00001 \
-    --batch_size 1 \
+    --batch_size 4 \
     --eval_freq 1 \
     --gpu_id 0 \
     --row 2 --line 2 \
 	--point_loss_coef 0.0002 \
-	--resume /home/sposhiya/Documents/TumorAI/CrowdCounting-P2PNet/results/multiclass_mixedimg/weights/best_mae.pth \
+	--resume results/multiclass_mixedimg/weights/best_mae.pth \
 	--freeze_regression

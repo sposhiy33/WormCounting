@@ -476,7 +476,7 @@ def equal_crop(img, den, labels, num_patches: int = 4):
 
 
 # random crop augumentation
-def random_crop(img, den, labels, edge_image = None, num_patch: int = 2):
+def random_crop(img, den, labels, edge_image = None, num_patch: int = 4):
 
     half_h = 512
     half_w = 512
