@@ -44,7 +44,8 @@ def get_args_parser():
         default=None,
         help="Path to the pretrained model. If set, only the mask head will be trained",
     )
-    parser.add_argument("--pre_weights", type=str)
+    
+    parser.add_argument("--pre_weights", type=str, default=None,)
 
     # * Backbone
     parser.add_argument(
@@ -73,7 +74,7 @@ def get_args_parser():
     )
 
     # * Loss coefficients (guide training scheme)
-    parser.add_argument("--point_loss_coef", default=0.5, type=float)
+    parser.add_argument("--point_loss_coef", default=0.0002, type=float)
 
     parser.add_argument(
         "--eos_coef",
@@ -144,10 +145,12 @@ def get_args_parser():
     )
 
     parser.add_argument("--seed", default=42, type=int)
-    parser.add_argument("--resume", default="", help="resume from checkpoint")
+    parser.add_argument("--resume", type=str, default=None, help="resume from checkpoint")
     parser.add_argument(
         "--start_epoch", default=0, type=int, metavar="N", help="start epoch"
     )
+    parser.add_argument("--freeze_regression", action="store_true", help="freeze regression branch during training")
+    
     parser.add_argument("--eval", action="store_true")
     parser.add_argument("--num_workers", default=8, type=int)
     parser.add_argument(
@@ -191,6 +194,7 @@ def main(args):
 
     if args.frozen_weights is not None:
         assert args.masks, "Frozen training is meant for segmentation only"
+    
     # backup the arguments
     print(args)
     with open(run_log_name, "a") as log_file:
@@ -201,11 +205,13 @@ def main(args):
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
+    
     # get the P2PNet model
     model, criterion = build_model(args, training=True)
-    # move to GPU
+    # send model and criterion to GPU
     model.to(device)
     criterion.to(device)
+
 
     model_without_ddp = model
 
@@ -232,6 +238,22 @@ def main(args):
     # Adam is used by default
     optimizer = torch.optim.Adam(param_dicts, lr=args.lr)
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, args.lr_drop)
+
+    # resume the weights and training state if exists
+    if args.resume is not None:
+        print("using RESUME")
+        checkpoint = torch.load(args.resume, map_location="cpu")
+        model.load_state_dict(checkpoint["model"])
+        if (
+            not args.eval
+            and "optimizer" in checkpoint
+            and "lr_scheduler" in checkpoint
+            and "epoch" in checkpoint
+        ):
+            optimizer.load_state_dict(checkpoint["optimizer"])
+            lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
+            args.start_epoch = checkpoint["epoch"] + 1
+        
     # create the dataset
     loading_data = build_dataset(args=args)
     # create the training and valiation set
@@ -274,19 +296,33 @@ def main(args):
     if args.frozen_weights is not None:
         checkpoint = torch.load(args.frozen_weights, map_location="cpu")
         model_without_ddp.detr.load_state_dict(checkpoint["model"])
-    # resume the weights and training state if exists
-    if args.resume:
-        checkpoint = torch.load(args.resume, map_location="cpu")
-        model_without_ddp.load_state_dict(checkpoint["model"])
-        if (
-            not args.eval
-            and "optimizer" in checkpoint
-            and "lr_scheduler" in checkpoint
-            and "epoch" in checkpoint
-        ):
-            optimizer.load_state_dict(checkpoint["optimizer"])
-            lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
-            args.start_epoch = checkpoint["epoch"] + 1
+
+    if args.resume is not None:
+        print("RESUME CHECKPOINT --> initial eval")
+        t1 = time.time()
+        result = evaluate_crowd_no_overlap(model, data_loader_val, device)
+        t2 = time.time()
+
+        # print the evaluation results
+        print(
+            "=======================================test======================================="
+        )
+        print(
+            "mae:",
+            result[0],
+            "mse:",
+            result[1],
+            "time:",
+            t2 - t1,
+        )
+        print(
+            "=======================================test======================================="
+        )
+
+    if args.freeze_regression:
+        for params in model.regression.parameters(): 
+            params.requires_grad = False 
+        model.regression.eval()
 
     print("Start training")
     start_time = time.time()

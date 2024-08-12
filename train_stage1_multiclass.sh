@@ -1,4 +1,4 @@
-CUDA_VISIBLE_DEVICES=0 python train.py --expname $1 --data_root $2 \
+UDA_VISIBLE_DEVICES=0 python train.py --expname $1 --data_root $2 \
     --dataset_file WORM --multiclass --num_classes 2 --ce_coef 0.7 1 \
     --epochs 250 \
     --lr_drop 250 \
@@ -8,4 +8,7 @@ CUDA_VISIBLE_DEVICES=0 python train.py --expname $1 --data_root $2 \
     --batch_size 1 \
     --eval_freq 1 \
     --gpu_id 0 \
-    --row 2 --line 2 
+    --row 2 --line 2 \
+	--point_loss_coef 0.0002 \
+	--resume /home/sposhiya/Documents/TumorAI/CrowdCounting-P2PNet/results/multiclass_mixedimg/weights/best_mae.pth \
+	--freeze_regression
