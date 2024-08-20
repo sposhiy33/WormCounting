@@ -1,5 +1,4 @@
 import argparse
-import datetime
 import os
 import random
 import time
@@ -8,6 +7,7 @@ from pathlib import Path
 
 import numpy
 import torch
+from torchinfo import summary 
 from tensorboardX import SummaryWriter
 from torch.utils.data import DataLoader, DistributedSampler
 
@@ -44,8 +44,12 @@ def get_args_parser():
         default=None,
         help="Path to the pretrained model. If set, only the mask head will be trained",
     )
-    
-    parser.add_argument("--pre_weights", type=str, default=None,)
+
+    parser.add_argument(
+        "--pre_weights",
+        type=str,
+        default=None,
+    )
 
     # * Backbone
     parser.add_argument(
@@ -145,12 +149,18 @@ def get_args_parser():
     )
 
     parser.add_argument("--seed", default=42, type=int)
-    parser.add_argument("--resume", type=str, default=None, help="resume from checkpoint")
+    parser.add_argument(
+        "--resume", type=str, default=None, help="resume from checkpoint"
+    )
     parser.add_argument(
         "--start_epoch", default=0, type=int, metavar="N", help="start epoch"
     )
-    parser.add_argument("--freeze_regression", action="store_true", help="freeze regression branch during training")
-    
+    parser.add_argument(
+        "--freeze_regression",
+        action="store_true",
+        help="freeze regression branch during training",
+    )
+
     parser.add_argument("--eval", action="store_true")
     parser.add_argument("--num_workers", default=8, type=int)
     parser.add_argument(
@@ -194,7 +204,7 @@ def main(args):
 
     if args.frozen_weights is not None:
         assert args.masks, "Frozen training is meant for segmentation only"
-    
+
     # backup the arguments
     print(args)
     with open(run_log_name, "a") as log_file:
@@ -205,13 +215,12 @@ def main(args):
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
-    
+
     # get the P2PNet model
     model, criterion = build_model(args, training=True)
     # send model and criterion to GPU
     model.to(device)
     criterion.to(device)
-
 
     model_without_ddp = model
 
@@ -253,7 +262,7 @@ def main(args):
             optimizer.load_state_dict(checkpoint["optimizer"])
             lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
             args.start_epoch = checkpoint["epoch"] + 1
-        
+
     # create the dataset
     loading_data = build_dataset(args=args)
     # create the training and valiation set
@@ -320,9 +329,11 @@ def main(args):
         )
 
     if args.freeze_regression:
-        for params in model.regression.parameters(): 
-            params.requires_grad = False 
+        for params in model.regression.parameters():
+            params.requires_grad = False
         model.regression.eval()
+
+    print(summary(model, input_size=(4,3,512,512)))
 
     print("Start training")
     start_time = time.time()
@@ -347,14 +358,16 @@ def main(args):
             epoch,
             args.clip_max_norm,
         )
-   
+
         loss.append(stat["loss"])
         # record the training states after every epoch
         if writer is not None:
             with open(run_log_name, "a") as log_file:
                 log_file.write("loss/loss@{}: {}".format(epoch, stat["loss"]))
                 log_file.write("loss/loss_ce@{}: {}".format(epoch, stat["loss_ce"]))
-                log_file.write("loss/loss_point@{}: {}". format(epoch, stat["loss_point"]))
+                log_file.write(
+                    "loss/loss_point@{}: {}".format(epoch, stat["loss_point"])
+                )
             writer.add_scalar("loss/loss", stat["loss"], epoch)
             writer.add_scalar("loss/loss_ce", stat["loss_ce"], epoch)
             writer.add_scalar("loss/loss_point", stat["loss_point"], epoch)
@@ -378,8 +391,7 @@ def main(args):
             },
             checkpoint_latest_path,
         )
-        
-        
+
         # save model with the lowest training loss
         if min_loss > stat["loss"]:
             checkpoint_best_path = os.path.join(weight_path, "best_training_loss.pth")
@@ -447,7 +459,6 @@ def main(args):
                     },
                     checkpoint_best_path,
                 )
-            
 
     # total time for training
     total_time = time.time() - start_time

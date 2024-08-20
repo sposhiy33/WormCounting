@@ -205,7 +205,7 @@ def load_data(img_gt_path, train, multiclass, class_filter):
         for i in labels:
             if i == class_filter: class_filter_mask.append(True)
             else: class_filter_mask.append(False)
-        labels = [i for keep, i in zip(class_filter_mask, labels) if keep]
+        labels = [1 for keep, i in zip(class_filter_mask, labels) if keep]
         points = [i for keep, i in zip(class_filter_mask, points) if keep]
 
     return img, np.array(points), np.array(labels)
@@ -476,8 +476,9 @@ def equal_crop(img, den, labels, num_patches: int = 4):
 
 
 # random crop augumentation
-def random_crop(img, den, labels, edge_image = None, num_patch: int = 4):
+def random_crop(img, den, labels, edge_image = None, num_patch: int = 1):
 
+    # try to use 256 * 256 resolution
     half_h = 512
     half_w = 512
     # half_h = img.size()[1]//4
@@ -487,6 +488,7 @@ def random_crop(img, den, labels, edge_image = None, num_patch: int = 4):
     else: result_img = np.zeros([num_patch*2, img.shape[0], half_h, half_w]) 
     result_den = []
     result_lab = []
+    
     # crop num_patch for each image
     # keep sampling patches until all have non-zero number of samples in them (hence the while loop)
     current_count = 0
