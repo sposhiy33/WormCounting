@@ -242,7 +242,7 @@ class P2PNet(nn.Module):
 
         self.anchor_points = AnchorPoints(
             pyramid_levels=[
-                3,
+                2,
             ],
             row=row,
             line=line,
@@ -254,12 +254,11 @@ class P2PNet(nn.Module):
         # get the backbone features
         features = self.backbone(samples)
         # forward the feature pyramid
-        features_fpn = self.fpn([features[1], features[2], features[3]])
-
+        features_fpn = self.fpn([features[1], features[2], features[3]]) 
         batch_size = features[0].shape[0]
         # run the regression and classification branch
-        regression = self.regression(features_fpn[1]) * 100  # 8x
-        classification = self.classification(features_fpn[1])
+        regression = self.regression(features_fpn[0]) * 100  # 8x
+        classification = self.classification(features_fpn[0])
         anchor_points = self.anchor_points(samples).repeat(batch_size, 1, 1)
         # decode the points as prediction
         output_coord = regression + anchor_points

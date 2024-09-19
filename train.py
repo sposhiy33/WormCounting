@@ -223,7 +223,7 @@ def main(args):
     criterion.to(device)
 
     model_without_ddp = model
-
+    
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print("number of params:", n_parameters)
     # use different optimation params for different parts of the model
