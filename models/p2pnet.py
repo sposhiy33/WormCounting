@@ -543,7 +543,7 @@ class SetCriterion_Crowd(nn.Module):
         pred_logits = outputs["pred_logits"].clone().detach().cpu()
         pred_points = outputs["pred_points"].clone().detach().cpu()
         
-        prop_points = []
+        positive_points = []
         for i in range(samples.size()[0]):
             outputs_scores = torch.nn.functional.softmax(pred_logits[i].unsqueeze(0), -1)[:, :, 1][0]
             points = (
@@ -552,25 +552,28 @@ class SetCriterion_Crowd(nn.Module):
                     .cpu()
                     .numpy()
                     .tolist())
-            prop_points.append(points)
-
-        prop_points = torch.Tensor(prop_points)
-        print(prop_points.size())
-        # distance between each prop points
-        dist = torch.cdist(prop_points, prop_points, p=2.0)
-        if prop_points.size()[1] == 0:
-            topk = torch.full((1,1,2), float((2**32)-1))
-            vals = topk[:,:,1:]
-        elif prop_points.size()[1] < 4:
-            topk = torch.topk(dist, 2, largest=False)
-            vals = topk.values[:,:,1:]
-        else:
-            topk = torch.topk(dist, 3, largest=False)
-            vals = topk.values[:,:,1:]
-        
-        # remove the first column of values (all zero, same points distance)
-        mean = torch.mean(torch.mean(vals, dim=-1), dim=-1)
-        print(1/mean)
+            positive_points.append(points)
+        total_mean = []
+        for i in range(len(positive_points)):
+            prop_points = torch.Tensor(positive_points[i])
+            if len(prop_points.size()) == 1:
+                prop_points = torch.unsqueeze(prop_points, 0)
+            # distance between each prop points
+            dist = torch.cdist(torch.unsqueeze(prop_points,0), torch.unsqueeze(prop_points,0), p=2.0)
+            if prop_points.size()[0] == 0 or prop_points.size()[0] == 1:
+                topk = torch.full((1,1,2), float((2**32)-1))
+                vals = topk[:,:,1:]
+            elif prop_points.size()[0] < 4:
+                topk = torch.topk(dist, 2, largest=False)
+                vals = topk.values[:,:,1:]
+            else:
+                topk = torch.topk(dist, 3, largest=False)
+                vals = topk.values[:,:,1:]
+            
+            # remove the first column of values (all zero, same points distance)
+            mean = torch.mean(torch.mean(vals, dim=-1), dim=-1)
+            total_mean.append(mean)
+        mean = torch.mean(torch.Tensor(total_mean), dim=-1)
         return {"loss_distance": (1.0/mean).to("cuda")}, {"class_loss_distance": 1.0}
 
 
