@@ -254,7 +254,7 @@ class P2PNet(nn.Module):
         # get the backbone features
         features = self.backbone(samples)
         # forward the feature pyramid
-        features_fpn = self.fpn([features[1], features[2], features[3]]) 
+        features_fpn = self.fpn([features[1], features[2], features[3]])
         batch_size = features[0].shape[0]
         # run the regression and classification branch
         regression = self.regression(features_fpn[0]) * 100  # 8x
@@ -478,12 +478,12 @@ class SetCriterion_Crowd(nn.Module):
 
     def loss_dense(self, outputs, targets, indices, num_points, samples):
 
-        gaussian_kernel = np.array() # this kernel needs to be populated
+        gaussian_kernel = np.array()  # this kernel needs to be populated
 
         gt_heatmap = np.zeros([samples.size()[0], samples.size()[2], samples.size()[3]])
         target_points = [t["point"][i] for t, (_, i) in zip(targets, indices)]
 
-        # populate the ground truth heatmap 
+        # populate the ground truth heatmap
         for i in range(samples.size()[0]):
             target_points[i] = target_points[1].detach().cpu()
             for point in target_points[i]:
@@ -493,8 +493,9 @@ class SetCriterion_Crowd(nn.Module):
                         x_coord = int(point[0]) - 2 + x
                         y_coord = int(point[1]) - 2 + y
                         if ((x_coord >= 0) and (x_coord < samples.size()[2])) and (
-                            (y_coord >= 0) and (y_coord < samples.size()[3])):
-                            
+                            (y_coord >= 0) and (y_coord < samples.size()[3])
+                        ):
+
                             gt_heatmap[i, x_coord, y_coord] += gaussian_kernel[x, y]
 
         # calculate point proposals
@@ -502,18 +503,17 @@ class SetCriterion_Crowd(nn.Module):
         pred_points = outputs["pred_points"].clone().detach().cpu()
         prop_points = []
         for i in range(samples.size()[0]):
-            outputs_scores = torch.nn.functional.softmax(pred_logits[i].unsqueeze(0), -1)[:, :, 1][0]
+            outputs_scores = torch.nn.functional.softmax(
+                pred_logits[i].unsqueeze(0), -1
+            )[:, :, 1][0]
             points = (
-                    pred_points[i][outputs_scores > 0.5]
-                    .detach()
-                    .cpu()
-                    .numpy()
-                    .tolist()
-                    )
+                pred_points[i][outputs_scores > 0.5].detach().cpu().numpy().tolist()
+            )
             prop_points.append(points)
-                
-        
-        prop_heatmap = np.zeros([samples.size()[0], samples.size()[2], samples.size()[3]])
+
+        prop_heatmap = np.zeros(
+            [samples.size()[0], samples.size()[2], samples.size()[3]]
+        )
         # populate proposal density map
         for i in range(samples.size()[0]):
             for point in prop_points[i]:
@@ -523,17 +523,83 @@ class SetCriterion_Crowd(nn.Module):
                         x_coord = int(point[0]) - 2 + x
                         y_coord = int(point[1]) - 2 + y
                         if ((x_coord >= 0) and (x_coord < samples.size()[2])) and (
-                            (y_coord >= 0) and (y_coord < samples.size()[3])):
-                            
+                            (y_coord >= 0) and (y_coord < samples.size()[3])
+                        ):
+
                             prop_heatmap[i, x_coord, y_coord] += gaussian_kernel[x, y]
-    
+
         gt_heatmap = torch.Tensor(gt_heatmap)
         prop_heatmap = torch.Tensor(prop_heatmap)
         gt_heatmap = torch.flatten(gt_heatmap)
         prop_heatmap = torch.flatten(prop_heatmap)
-        dist = torch.sum(torch.abs(gt_heatmap - prop_heatmap)).item() / (samples.size()[0] * samples.size()[2] ** 2)
+        dist = torch.sum(torch.abs(gt_heatmap - prop_heatmap)).item() / (
+            samples.size()[0] * samples.size()[2] ** 2
+        )
 
         return {"loss_density": dist}, {"class_loss_density": 1.0}
+
+    def loss_dense_estimation(self, outputs, targets, indicies, num_points, samples):
+        # create image paritions
+        x_width = samples.size()[2] // 4
+        y_width = samples.size()[3] // 4
+        coords = []
+        for i in range(4):
+            for j in range(4):
+                coords.append(
+                    [
+                        [i * (x_width), (i + 1) * (x_width)],
+                        [j * (y_width), (j + 1) * (y_width)],
+                    ]
+                )
+        pred_heatmap = np.zeros(shape=(samples.size()[0], 4, 4))
+        gt_heatmap = np.zeros(shape=(samples.size()[0], 4, 4))
+
+        # get prediction outputs and ground truth points
+        assert "pred_points" in outputs
+        assert "pred_logits" in outputs
+        pred_points = outputs["pred_points"].clone().detach().cpu()
+        pred_logits = outputs["pred_logits"].clone().detach().cpu()
+        # populate the proposal heatmap estimation
+        for batch in range(samples.size()[0]):
+            outputs_scores = torch.nn.functional.softmax(
+                pred_logits[batch].unsqueeze(0), -1
+            )[:, :, 1][0]
+            points = (
+                pred_points[batch][outputs_scores > 0.5].detach().cpu().numpy().tolist()
+            )
+            points = torch.Tensor(points) 
+            if points.size()[0] > 0:
+                for i,current_coord in enumerate(coords):
+                    # get indicies of all points proposal above treshold
+                    idx = (
+                        (points[:, 0] >= current_coord[1][0])
+                         & (points[:, 0] < current_coord[1][1])
+                         & (points[:, 1] >= current_coord[0][0])
+                         & (points[:, 1] < current_coord[0][1])
+                    )
+                    num = torch.sum(idx == True)
+                    pred_heatmap[batch][(i//4)][i - (4*(i//4))] = num.item() 
+            
+        # populate the ground truth heatmap
+        for batch in range(len(targets)):
+            points = targets[batch]["point"]
+            if points.size()[0] > 0:
+                for i,current_coord in enumerate(coords):
+                    # get indicies of all points proposal above treshold
+                    idx = (
+                        (points[:, 0] >= current_coord[1][0])
+                         & (points[:, 0] < current_coord[1][1])
+                         & (points[:, 1] >= current_coord[0][0])
+                         & (points[:, 1] < current_coord[0][1])
+                    )
+                    num = torch.sum(idx == True)
+                    gt_heatmap[batch][i//4][i-(4*(i//4))] = num.item()
+               
+        difference_heatmap = gt_heatmap - pred_heatmap
+        square_error = np.square(difference_heatmap)
+        mean = np.mean(square_error)
+
+        return {"loss_dense_estimation": mean}, {"loss_dense_estimation_classwise": 1.0}
 
     # self-regulation term to limit the distance between positive proposal points
     def loss_distance(self, outputs, targets, indicies, num_points, samples):
@@ -542,16 +608,15 @@ class SetCriterion_Crowd(nn.Module):
         # return all positive samples
         pred_logits = outputs["pred_logits"].clone().detach().cpu()
         pred_points = outputs["pred_points"].clone().detach().cpu()
-        
+
         positive_points = []
         for i in range(samples.size()[0]):
-            outputs_scores = torch.nn.functional.softmax(pred_logits[i].unsqueeze(0), -1)[:, :, 1][0]
+            outputs_scores = torch.nn.functional.softmax(
+                pred_logits[i].unsqueeze(0), -1
+            )[:, :, 1][0]
             points = (
-                    pred_points[i][outputs_scores > 0.5]
-                    .detach()
-                    .cpu()
-                    .numpy()
-                    .tolist())
+                pred_points[i][outputs_scores > 0.5].detach().cpu().numpy().tolist()
+            )
             positive_points.append(points)
         total_mean = []
         for i in range(len(positive_points)):
@@ -559,23 +624,24 @@ class SetCriterion_Crowd(nn.Module):
             if len(prop_points.size()) == 1:
                 prop_points = torch.unsqueeze(prop_points, 0)
             # distance between each prop points
-            dist = torch.cdist(torch.unsqueeze(prop_points,0), torch.unsqueeze(prop_points,0), p=2.0)
+            dist = torch.cdist(
+                torch.unsqueeze(prop_points, 0), torch.unsqueeze(prop_points, 0), p=2.0
+            )
             if prop_points.size()[0] == 0 or prop_points.size()[0] == 1:
-                topk = torch.full((1,1,2), float((2**32)-1))
-                vals = topk[:,:,1:]
+                topk = torch.full((1, 1, 2), float((2**32) - 1))
+                vals = topk[:, :, 1:]
             elif prop_points.size()[0] < 4:
                 topk = torch.topk(dist, 2, largest=False)
-                vals = topk.values[:,:,1:]
+                vals = topk.values[:, :, 1:]
             else:
                 topk = torch.topk(dist, 3, largest=False)
-                vals = topk.values[:,:,1:]
-            
+                vals = topk.values[:, :, 1:]
+
             # remove the first column of values (all zero, same points distance)
             mean = torch.mean(torch.mean(vals, dim=-1), dim=-1)
             total_mean.append(mean)
         mean = torch.mean(torch.Tensor(total_mean), dim=-1)
-        return {"loss_distance": (1.0/mean).to("cuda")}, {"class_loss_distance": 1.0}
-
+        return {"loss_distance": (1.0 / mean).to("cuda")}, {"class_loss_distance": 1.0}
 
     def _get_src_permutation_idx(self, indices):
         # permute predictions following indices
@@ -598,7 +664,8 @@ class SetCriterion_Crowd(nn.Module):
             "labels": self.loss_labels,
             "points": self.loss_points,
             "density": self.loss_dense,
-            "distance": self.loss_distance
+            "density_estimation": self.loss_dense_estimation,
+            "distance": self.loss_distance,
         }
         assert loss in loss_map, f"do you really want to compute {loss} loss?"
         return loss_map[loss](outputs, targets, indices, num_points, samples, **kwargs)
@@ -647,8 +714,14 @@ def build_p2p(args, training):
     if not training:
         return model
 
-    weight_dict = {"loss_ce": 1, "loss_point": args.point_loss_coef, "loss_dense": 1, "loss_distance": 1}
-    losses = ["labels", "points", "distance"]
+    weight_dict = {
+        "loss_ce": 1,
+        "loss_point": args.point_loss_coef,
+        "loss_dense": 1,
+        "loss_distance": 1,
+        "loss_dense_estimation": 1,
+    }
+    losses = ["labels", "points", "distance", "density_estimation"]
     matcher = build_matcher_crowd(args)
     criterion = SetCriterion_Crowd(
         args.num_classes,
