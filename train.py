@@ -94,6 +94,9 @@ def get_args_parser():
     )
 
     parser.add_argument(
+        "--map_res", default=4, type=int, help="resoltion down sampling factor (each axis), total downsample will be map_res^2"
+    )
+    parser.add_argument(
         "--dense_coef", default=1, type=float, help="relative weight of density loss"
     )
 

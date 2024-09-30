@@ -388,7 +388,7 @@ Create objective function for the P2P pipeline, both classification and regressi
 
 class SetCriterion_Crowd(nn.Module):
 
-    def __init__(self, num_classes, matcher, weight_dict, eos_coef, ce_coef, losses):
+    def __init__(self, num_classes, matcher, weight_dict, eos_coef, ce_coef, map_res, losses):
         """Create the criterion.
         Parameters:
             num_classes: number of object categories, omitting the special no-object category
@@ -403,6 +403,7 @@ class SetCriterion_Crowd(nn.Module):
         self.weight_dict = weight_dict
         self.eos_coef = eos_coef
         self.ce_coef = ce_coef
+        self.map_res = map_res
         self.losses = losses
         ce_weight = torch.ones(self.num_classes + 1)
         ce_weight[0] = self.eos_coef
@@ -540,8 +541,8 @@ class SetCriterion_Crowd(nn.Module):
 
     def loss_dense_estimation(self, outputs, targets, indicies, num_points, samples):
         # create image paritions
-        x_width = samples.size()[2] // 4
-        y_width = samples.size()[3] // 4
+        x_width = samples.size()[2] // self.map_res
+        y_width = samples.size()[3] // self.map_res
         coords = []
         for i in range(4):
             for j in range(4):
@@ -551,8 +552,8 @@ class SetCriterion_Crowd(nn.Module):
                         [j * (y_width), (j + 1) * (y_width)],
                     ]
                 )
-        pred_heatmap = np.zeros(shape=(samples.size()[0], 4, 4))
-        gt_heatmap = np.zeros(shape=(samples.size()[0], 4, 4))
+        pred_heatmap = np.zeros(shape=(samples.size()[0], self.map_res, self.map_res))
+        gt_heatmap = np.zeros(shape=(samples.size()[0], self.map_res, self.map_res))
 
         # get prediction outputs and ground truth points
         assert "pred_points" in outputs
@@ -578,7 +579,7 @@ class SetCriterion_Crowd(nn.Module):
                          & (points[:, 1] < current_coord[0][1])
                     )
                     num = torch.sum(idx == True)
-                    pred_heatmap[batch][(i//4)][i - (4*(i//4))] = num.item() 
+                    pred_heatmap[batch][(i//self.map_res)][i - (self.map_res*(i//self.map_res))] = num.item() 
             
         # populate the ground truth heatmap
         for batch in range(len(targets)):
@@ -593,7 +594,7 @@ class SetCriterion_Crowd(nn.Module):
                          & (points[:, 1] < current_coord[0][1])
                     )
                     num = torch.sum(idx == True)
-                    gt_heatmap[batch][i//4][i-(4*(i//4))] = num.item()
+                    gt_heatmap[batch][i//self.map_res][i-(self.map_res*(i//self.map_res))] = num.item()
                
         difference_heatmap = gt_heatmap - pred_heatmap
         square_error = np.square(difference_heatmap)
@@ -729,6 +730,7 @@ def build_p2p(args, training):
         weight_dict=weight_dict,
         eos_coef=args.eos_coef,
         ce_coef=args.ce_coef,
+        map_res=args.map_res,
         losses=losses,
     )
 
