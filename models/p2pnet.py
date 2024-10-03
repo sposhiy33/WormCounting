@@ -720,7 +720,7 @@ def build_p2p(args, training):
         "loss_point": args.point_loss_coef,
         "loss_dense": 1,
         "loss_distance": 1,
-        "loss_dense_estimation": 1,
+        "loss_dense_estimation": args.dense_loss_coef,
     }
     losses = ["labels", "points", "distance", "density_estimation"]
     matcher = build_matcher_crowd(args)

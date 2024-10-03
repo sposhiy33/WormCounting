@@ -9,7 +9,7 @@ UDA_VISIBLE_DEVICES=0 python train.py --expname $1 --data_root $2 \
     --eval_freq 1 \
     --gpu_id 0 \
     --row 1	--line 1 \
-	--point_loss_coef 0.0002 \
+	--point_loss_coef 0.001 \
 	--map_res 16 \
 	--class_filter 1
 	# --resume results/multiclass_mixedimg/weights/best_mae.pth \

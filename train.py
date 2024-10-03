@@ -1,3 +1,4 @@
+import datetime
 import argparse
 import os
 import random
@@ -79,6 +80,9 @@ def get_args_parser():
 
     # * Loss coefficients (guide training scheme)
     parser.add_argument("--point_loss_coef", default=0.0002, type=float)
+    
+    parser.add_argument("--dense_loss_coef", default=1, type=float,
+                        help="relative loss weight of dense estimation loss")
 
     parser.add_argument(
         "--eos_coef",
