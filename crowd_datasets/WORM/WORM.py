@@ -179,7 +179,7 @@ def load_data(img_gt_path, train, multiclass, class_filter):
                     # if the label is included in the point txt file, use this scheme
                     if elements == 3:
                         lab = str(line.strip().split("\t")[2].strip())
-                        if lab == "Gravid":
+                        if lab == "embryo":
                             labels.append(2)
                         elif lab == "L1":
                             labels.append(1)
@@ -492,22 +492,27 @@ def random_crop(img, den, labels, edge_image = None, num_patch: int = 1):
     # crop num_patch for each image
     # keep sampling patches until all have non-zero number of samples in them (hence the while loop)
     current_count = 0
+
     while current_count < num_patch:
         start_h = random.randint(0, img.size(1) - half_h)
         start_w = random.randint(0, img.size(2) - half_w)
         end_h = start_h + half_h
         end_w = start_w + half_w
         # copy the cropped points
-        idx = (
-            (den[:, 0] >= start_w)
-            & (den[:, 0] <= end_w)
-            & (den[:, 1] >= start_h)
-            & (den[:, 1] <= end_h)
-        )
-        # shift the corrdinates
-        record_den = den[idx]
-        record_lab = labels[idx]
+        if den.shape[0] > 0: 
+            idx = (
+                (den[:, 0] >= start_w)
+                & (den[:, 0] <= end_w)
+                & (den[:, 1] >= start_h)
+                & (den[:, 1] <= end_h)
+            )
+            # shift the corrdinates
+            record_den = den[idx]
+            record_lab = labels[idx]
+        else:
+            record_den = den
         # gaurentee that each patch sample has point in it 
+        
         if len(record_den) > 0:
             # copy the cropped rect
             result_img[current_count] = img[:, start_h:end_h, start_w:end_w]
