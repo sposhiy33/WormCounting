@@ -173,26 +173,13 @@ def load_data(img_gt_path, train, multiclass, class_filter):
                 elements = len(line.strip().split("\t"))
                 x = float(line.strip().split("\t")[0].strip())
                 y = float(line.strip().split("\t")[1].strip())
+                lab = str(line.strip().split("\t")[2].strip())
                 points.append([x, y])
                 # create labels
-                if multiclass:
-                    # if the label is included in the point txt file, use this scheme
-                    if elements == 3:
-                        lab = str(line.strip().split("\t")[2].strip())
-                        if lab == "embryo":
-                            labels.append(2)
-                        elif lab == "L1":
-                            labels.append(1)
-                    # else infer label from the img file name
-                    else:
-                        if "L1" in img_path:
-                            labels.append(1)
-                        elif "ADT" in img_path:
-                            labels.append(2)
-                        else:
-                            labels.append(2)  # default to the adult label
-                else:
-                    labels.append(1)
+                if lab in multiclass:
+                    index = multiclass.index(lab)
+                    labels.append(index+1)
+                
             else:
                 x = float(line.strip().split(" ")[0].replace(",", ""))
                 y = float(line.strip().split(" ")[1])
@@ -203,7 +190,7 @@ def load_data(img_gt_path, train, multiclass, class_filter):
 
         class_filter_mask = []
         for i in labels:
-            if i == class_filter: class_filter_mask.append(True)
+            if i == multiclass.index(class_filter): class_filter_mask.append(True)
             else: class_filter_mask.append(False)
         labels = [1 for keep, i in zip(class_filter_mask, labels) if keep]
         points = [i for keep, i in zip(class_filter_mask, points) if keep]

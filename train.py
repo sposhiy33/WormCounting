@@ -78,11 +78,19 @@ def get_args_parser():
         help="L1 point coefficient in the matching cost",
     )
 
+    parser.add_argument("--loss", nargs="+", type=str,
+                        help="specify which terms to include in the loss",
+                        default=["labels", "points"],
+                        choices=["labels", "points", "density", "count", "distance"])
     # * Loss coefficients (guide training scheme)
     parser.add_argument("--point_loss_coef", default=0.0002, type=float)
     
     parser.add_argument("--dense_loss_coef", default=1, type=float,
-                        help="relative loss weight of dense estimation loss")
+                        help="loss weight of dense estimation loss")
+    parser.add_argument("--count_loss_coef", default=1, type=float,
+                        help="loss weight of count estimation loss")
+    parser.add_argument("--distance_loss_coef", default=1, type=float,
+                        help="loss weight of distance regulation term")
 
     parser.add_argument(
         "--eos_coef",
@@ -100,9 +108,8 @@ def get_args_parser():
     parser.add_argument(
         "--map_res", default=4, type=int, help="resoltion down sampling factor (each axis), total downsample will be map_res^2"
     )
-    parser.add_argument(
-        "--dense_coef", default=1, type=float, help="relative weight of density loss"
-    )
+    parser.add_argument("--gauss_kernel_res", default=9, type=int,
+                        help="kernel size for generating heatmaps")
 
     parser.add_argument(
         "--row", default=3, type=int, help="row number of anchor points"
@@ -133,12 +140,13 @@ def get_args_parser():
     )
     parser.add_argument(
         "--multiclass",
-        action="store_true",
-        help="use mutliclass framework",
+        nargs="+",
+        type=str,
+        help="name of the classes",
     )
     parser.add_argument(
         "--class_filter",
-        type=int,
+        type=str,
         default=None,
         help="train on only the specified class index",
     )

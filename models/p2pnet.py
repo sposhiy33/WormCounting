@@ -388,7 +388,7 @@ Create objective function for the P2P pipeline, both classification and regressi
 
 class SetCriterion_Crowd(nn.Module):
 
-    def __init__(self, num_classes, matcher, weight_dict, eos_coef, ce_coef, map_res, losses):
+    def __init__(self, num_classes, matcher, weight_dict, eos_coef, ce_coef, map_res, gauss_kernel_res, losses):
         """Create the criterion.
         Parameters:
             num_classes: number of object categories, omitting the special no-object category
@@ -411,6 +411,17 @@ class SetCriterion_Crowd(nn.Module):
             ce_weight[i + 1] = weight
         self.register_buffer("ce_weight", ce_weight)
 
+        # initialize gaussian kernal
+        self.size = gauss_kernel_res
+        if self.size % 2 == 0:
+            raise(ValueError("map res must be odd"))
+         # Calculate the range of x and y values
+        ax = np.linspace(-(self.size // 2), self.size // 2, self.size)
+        gauss = np.exp(-0.5 * np.square(ax) / np.square(5))
+        self.kernel = np.outer(gauss, gauss)
+        # Calculate the 2D Gaussian function
+        self.kernel = self.kernel / np.sum(self.kernel)
+            
     def loss_labels(self, outputs, targets, indices, num_points, samples):
         """Classification loss (NLL)
         targets dicts must contain the key "labels" containing a tensor of dim [nb_target_boxes]
@@ -479,20 +490,21 @@ class SetCriterion_Crowd(nn.Module):
 
     def loss_dense(self, outputs, targets, indices, num_points, samples):
 
-        gaussian_kernel = np.array()  # this kernel needs to be populated
+        gaussian_kernel = self.kernel  # this kernel needs to be populated
 
         gt_heatmap = np.zeros([samples.size()[0], samples.size()[2], samples.size()[3]])
         target_points = [t["point"][i] for t, (_, i) in zip(targets, indices)]
-
         # populate the ground truth heatmap
+        # loop over batch
         for i in range(samples.size()[0]):
-            target_points[i] = target_points[1].detach().cpu()
-            for point in target_points[i]:
+            tar_points = target_points[i].detach().cpu()
+            # loop over all target points in the sample
+            for point in tar_points:
                 # place guassian kernel at that poit
                 for x in range(gaussian_kernel.shape[0]):
                     for y in range(gaussian_kernel.shape[1]):
-                        x_coord = int(point[0]) - 2 + x
-                        y_coord = int(point[1]) - 2 + y
+                        x_coord = int(point[0]) - int((self.size - 1)/2) + x
+                        y_coord = int(point[1]) - int((self.size - 1)/2) + y
                         if ((x_coord >= 0) and (x_coord < samples.size()[2])) and (
                             (y_coord >= 0) and (y_coord < samples.size()[3])
                         ):
@@ -521,8 +533,8 @@ class SetCriterion_Crowd(nn.Module):
                 # place guassian kernel at that poit
                 for x in range(gaussian_kernel.shape[0]):
                     for y in range(gaussian_kernel.shape[1]):
-                        x_coord = int(point[0]) - 2 + x
-                        y_coord = int(point[1]) - 2 + y
+                        x_coord = int(point[0]) - int((self.size - 1)/2) + x
+                        y_coord = int(point[1]) - int((self.size - 1)/2) + y
                         if ((x_coord >= 0) and (x_coord < samples.size()[2])) and (
                             (y_coord >= 0) and (y_coord < samples.size()[3])
                         ):
@@ -539,7 +551,7 @@ class SetCriterion_Crowd(nn.Module):
 
         return {"loss_density": dist}, {"class_loss_density": 1.0}
 
-    def loss_dense_estimation(self, outputs, targets, indicies, num_points, samples):
+    def loss_count(self, outputs, targets, indicies, num_points, samples):
         # create image paritions
         x_width = samples.size()[2] // self.map_res
         y_width = samples.size()[3] // self.map_res
@@ -600,7 +612,7 @@ class SetCriterion_Crowd(nn.Module):
         square_error = np.square(difference_heatmap)
         mean = np.mean(square_error)
 
-        return {"loss_dense_estimation": mean}, {"loss_dense_estimation_classwise": 1.0}
+        return {"loss_count": mean}, {"loss_count_classwise": 1.0}
 
     # self-regulation term to limit the distance between positive proposal points
     def loss_distance(self, outputs, targets, indicies, num_points, samples):
@@ -665,7 +677,7 @@ class SetCriterion_Crowd(nn.Module):
             "labels": self.loss_labels,
             "points": self.loss_points,
             "density": self.loss_dense,
-            "density_estimation": self.loss_dense_estimation,
+            "count": self.loss_count,
             "distance": self.loss_distance,
         }
         assert loss in loss_map, f"do you really want to compute {loss} loss?"
@@ -718,11 +730,11 @@ def build_p2p(args, training):
     weight_dict = {
         "loss_ce": 1,
         "loss_point": args.point_loss_coef,
-        "loss_dense": 1,
-        "loss_distance": 1,
-        "loss_dense_estimation": args.dense_loss_coef,
+        "loss_dense": args.dense_loss_coef,
+        "loss_distance": args.distance_loss_coef,
+        "loss_count": args.count_loss_coef,
     }
-    losses = ["labels", "points", "distance", "density_estimation"]
+    losses = args.loss
     matcher = build_matcher_crowd(args)
     criterion = SetCriterion_Crowd(
         args.num_classes,
@@ -731,6 +743,7 @@ def build_p2p(args, training):
         eos_coef=args.eos_coef,
         ce_coef=args.ce_coef,
         map_res=args.map_res,
+        gauss_kernel_res=args.gauss_kernel_res,
         losses=losses,
     )
 
