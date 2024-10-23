@@ -40,17 +40,20 @@ def get_arg_parser():
     )
     parser.add_argument("--dataroot", type=str)
     parser.add_argument("--dataset_file", default="WORM_VAL")
+    
     parser.add_argument(
         "--multiclass",
-        action="store_true",
-        help="framework to consider using the multiclass framwork or not",
+        nargs="+",
+        type=str,
+        help="name of the classes",
     )
     parser.add_argument(
         "--class_filter",
-        type=int,
+        type=str,
         default=None,
         help="train on only the specified class index",
     )
+
     parser.add_argument(
         "--hsv",
         action="store_true",
@@ -69,6 +72,7 @@ def get_arg_parser():
         action="store_true",
         help="equally partition the image (for test time)",
     )
+
     ## throwaway args
     parser.add_argument("--batch_size", default=8, type=int)
     parser.add_argument("--num_workers", default=8, type=int)
@@ -105,9 +109,9 @@ def main(args):
 
     # list of datasets to evaluate
     dataset_list = {
-        "MULTICLASS": "dataroot/resize_multiclass",
-        "L1": "dataroot/resize_L1",
-        "ADULT": "dataroot/worm_dataset",
+        #     "MULTICLASS": "dataroot/resize_multiclass",
+        #"L1": "dataroot/resize_L1",
+        #"ADULT": "dataroot/worm_dataset",
         "MIXED": "dataroot/resize_mixed_eval",
     }
     

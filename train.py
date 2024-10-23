@@ -293,6 +293,7 @@ def main(args):
         hse=args.hse,
         edges=args.edges,
     )
+
     # create the sampler used during training
     sampler_train = torch.utils.data.RandomSampler(train_set)
     sampler_val = torch.utils.data.SequentialSampler(val_set)
@@ -307,6 +308,20 @@ def main(args):
         collate_fn=utils.collate_fn_crowd,
         num_workers=args.num_workers,
     )
+
+    count = []
+    train_iter = iter(data_loader_train)
+    for i, classtype in enumerate(args.multiclass):
+        class_count = []
+        for batch in range(len(data_loader_train)):
+            try: 
+                sample, target = next(train_iter)
+            except: pass
+            for x in target:
+                truth = (x["labels"] == i+1)
+                class_count.append(torch.sum(truth.int()).item())
+        count.append(sum(class_count))
+    print(count)
 
     data_loader_val = DataLoader(
         val_set,
@@ -386,6 +401,8 @@ def main(args):
             writer.add_scalar("loss/loss", stat["loss"], epoch)
             writer.add_scalar("loss/loss_ce", stat["loss_ce"], epoch)
             writer.add_scalar("loss/loss_point", stat["loss_point"], epoch)
+            if len(args.loss) > 2:
+                writer.add_scalar("loss/loss_dense", stat["loss_dense"], epoch)
         t2 = time.time()
         print(
             "[ep %d][lr %.7f][%.2fs]"

@@ -1,5 +1,5 @@
 CUDA_VISIBLE_DEVICES=0 python train.py --expname $1 --data_root $2 \
-    --dataset_file WORM --multiclass L1 Gravid --num_classes 2 --ce_coef 1 1 \
+    --dataset_file WORM --multiclass L1 embryo --num_classes 2 --ce_coef 0.5 1 \
 	--epochs 150 \
     --lr_drop 150 \
     --output_dir ./results/ \
@@ -16,6 +16,5 @@ CUDA_VISIBLE_DEVICES=0 python train.py --expname $1 --data_root $2 \
 	--loss labels points density \
 	--map_res 16 \
 	--gauss_kernel_res 25 \
-
 	# --resume results/multiclass_mixedimg/weights/best_mae.pth \
 	# --freeze_regression

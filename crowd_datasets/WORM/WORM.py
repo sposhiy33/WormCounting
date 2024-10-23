@@ -190,11 +190,10 @@ def load_data(img_gt_path, train, multiclass, class_filter):
 
         class_filter_mask = []
         for i in labels:
-            if i == multiclass.index(class_filter): class_filter_mask.append(True)
+            if i == multiclass.index(class_filter) + 1 : class_filter_mask.append(True)
             else: class_filter_mask.append(False)
         labels = [1 for keep, i in zip(class_filter_mask, labels) if keep]
         points = [i for keep, i in zip(class_filter_mask, points) if keep]
-
     return img, np.array(points), np.array(labels)
 
 

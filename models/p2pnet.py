@@ -549,7 +549,7 @@ class SetCriterion_Crowd(nn.Module):
             samples.size()[0] * samples.size()[2] ** 2
         )
 
-        return {"loss_density": dist}, {"class_loss_density": 1.0}
+        return {"loss_dense": dist}, {"class_loss_dense": 1.0}
 
     def loss_count(self, outputs, targets, indicies, num_points, samples):
         # create image paritions
