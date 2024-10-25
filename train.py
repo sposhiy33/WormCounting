@@ -292,7 +292,20 @@ def main(args):
         hsv=args.hsv,
         hse=args.hse,
         edges=args.edges,
+        patch=True,
     )
+
+
+    train_set_stats, val_set_stats = loading_data( 
+        args.data_root,
+        multiclass=args.multiclass,
+        class_filter=args.class_filter,
+        hsv=args.hsv,
+        hse=args.hse,
+        edges=args.edges,
+        patch=False,
+    )
+
 
     # create the sampler used during training
     sampler_train = torch.utils.data.RandomSampler(train_set)
@@ -309,11 +322,17 @@ def main(args):
         num_workers=args.num_workers,
     )
 
+
+    # get count stats
+
+    data_loader_train_stats = DataLoader(
+        train_set_stats,
+        batch_size=1)
     count = []
-    train_iter = iter(data_loader_train)
+    train_iter = iter(data_loader_train_stats)
     for i, classtype in enumerate(args.multiclass):
         class_count = []
-        for batch in range(len(data_loader_train)):
+        for batch in range(len(data_loader_train_stats)):
             try: 
                 sample, target = next(train_iter)
             except: pass

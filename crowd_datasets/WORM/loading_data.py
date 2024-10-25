@@ -12,6 +12,7 @@ def loading_data(
     hsv=False,
     hse=False,
     edges=False,
+    patch=False,
 ):
 
     # the pre-proccssing transform
@@ -29,7 +30,7 @@ def loading_data(
         data_root,
         train=True,
         transform=transform,
-        patch=True,
+        patch=patch,
         rotate=False,
         scale=False,
         flip=False,

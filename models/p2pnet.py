@@ -545,9 +545,7 @@ class SetCriterion_Crowd(nn.Module):
         prop_heatmap = torch.Tensor(prop_heatmap)
         gt_heatmap = torch.flatten(gt_heatmap)
         prop_heatmap = torch.flatten(prop_heatmap)
-        dist = torch.sum(torch.abs(gt_heatmap - prop_heatmap)).item() / (
-            samples.size()[0] * samples.size()[2] ** 2
-        )
+        dist = (torch.sum(torch.abs(gt_heatmap - prop_heatmap)).item()) / samples.size()[0]
 
         return {"loss_dense": dist}, {"class_loss_dense": 1.0}
 

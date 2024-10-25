@@ -109,9 +109,9 @@ def main(args):
 
     # list of datasets to evaluate
     dataset_list = {
-        #     "MULTICLASS": "dataroot/resize_multiclass",
-        #"L1": "dataroot/resize_L1",
-        #"ADULT": "dataroot/worm_dataset",
+        # "MULTICLASS": "dataroot/resize_multiclass",
+        # "L1": "dataroot/resize_L1",
+        # "ADULT": "dataroot/worm_dataset",
         "MIXED": "dataroot/resize_mixed_eval",
     }
     
