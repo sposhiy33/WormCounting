@@ -320,16 +320,6 @@ def evaluate_crowd_w_fine_grained(
 def evaluate_crowd_no_overlap(
     model, data_loader, device, vis_dir=None, multiclass=False, num_classes=None
 ):
-    """Evaluation script to evaluate models
-    Parameters:
-    model: torch.nn.Module
-    data_loader: torch.utils.data.DataLoader
-    device: torch.device
-    vis_dir: str path --> path where to save visualization
-    multiclass: bool --> variable that enables the multiclass framework
-    num_classes:
-    """
-
     model.eval()
 
     metric_logger = utils.MetricLogger(delimiter="  ")
@@ -342,6 +332,59 @@ def evaluate_crowd_no_overlap(
 
     count = []
     gt_count = []
+
+
+    class_mae = []
+    class_mse = []
+    for i in range(num_classes):
+        i_mae = []
+        i_mse = []
+        for batch, batch_targets in data_loader:
+            for samples, targets in zip(batch, batch_targets): 
+                samples = samples.to(device)
+                samples = samples.unsqueeze(0)
+                # print(f"Samples: {samples.size()}")
+                outputs = model(samples)
+                # print(f"Pred Points: {outputs["pred_points"].size()}")
+                # print(f"Pred Logits: {outputs["pred_logits"].size()}")
+                # logits and class_labels of point proposals, to be populated
+                points = []
+                class_labels = []
+
+                outputs_points = outputs["pred_points"][0]
+                target_labels = targets["labels"].detach().numpy().tolist()
+                # 0.5 is used by default
+                threshold = 0.5
+                predict_cnt = 0
+
+                class_idx = i + 1
+                outputs_scores = torch.nn.functional.softmax(
+                    outputs["pred_logits"], -1)[:, :, class_idx][0]
+                prop_points = (
+                    outputs_points[outputs_scores > threshold]
+                    .detach()
+                    .cpu()
+                    .numpy()
+                    .tolist()
+                )
+                for p in prop_points:
+                    points.append(p)
+                    class_labels.append(class_idx)
+                predict_cnt = int((outputs_scores > threshold).sum())
+                gt_cnt = len([i for i in target_labels if i == class_idx])
+
+                mae = abs(predict_cnt - gt_cnt)
+                mse = (predict_cnt - gt_cnt) * (predict_cnt - gt_cnt)
+                i_mae.append(mae)
+                i_mse.append(mse)
+        i_mae = sum(i_mae) / len(i_mae)
+        i_mse = sum(i_mse) / len(i_mse)
+        i_mse = math.sqrt(i_mse)
+        class_mae.append(i_mae)
+        class_mse.append(i_mse)
+
+    print(class_mae)
+    print(class_mse)
 
     for batch, batch_targets in data_loader:
         for samples, targets in zip(batch, batch_targets): 
