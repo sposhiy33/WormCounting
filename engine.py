@@ -336,9 +336,11 @@ def evaluate_crowd_no_overlap(
 
     class_mae = []
     class_mse = []
+    class_dist = []
     for i in range(num_classes):
         i_mae = []
         i_mse = []
+        dist_list = []
         for batch, batch_targets in data_loader:
             for samples, targets in zip(batch, batch_targets): 
                 samples = samples.to(device)
@@ -353,6 +355,16 @@ def evaluate_crowd_no_overlap(
 
                 outputs_points = outputs["pred_points"][0]
                 target_labels = targets["labels"].detach().numpy().tolist()
+                target_point = targets["point"].detach().numpy().tolist()
+               
+                
+                ground_truth_points = []
+                # truth map --
+                for index, class_type in enumerate(target_labels):
+                    if class_type == i + 1:
+                        ground_truth_points.append(target_point[index])
+
+
                 # 0.5 is used by default
                 threshold = 0.5
                 predict_cnt = 0
@@ -367,6 +379,14 @@ def evaluate_crowd_no_overlap(
                     .numpy()
                     .tolist()
                 )
+                
+                if (len(ground_truth_points) > 0) and (len(prop_points) > 0):
+                    dist = torch.cdist(torch.Tensor(ground_truth_points),
+                                   torch.Tensor(prop_points),
+                                   p=2)
+                    min_dist = torch.min(dist, 1)
+                    mean_dist = torch.mean(min_dist[0])
+                    dist_list.append(mean_dist.item())
                 for p in prop_points:
                     points.append(p)
                     class_labels.append(class_idx)
@@ -380,11 +400,14 @@ def evaluate_crowd_no_overlap(
         i_mae = sum(i_mae) / len(i_mae)
         i_mse = sum(i_mse) / len(i_mse)
         i_mse = math.sqrt(i_mse)
+        dist_list = sum(dist_list) / len(dist_list)
         class_mae.append(i_mae)
         class_mse.append(i_mse)
+        class_dist.append(dist_list)
 
-    print(class_mae)
-    print(class_mse)
+    print(f"MAE: {class_mae}")
+    print(f"MSE: {class_mse}")
+    print(f"DIST: {class_dist}")
 
     for batch, batch_targets in data_loader:
         for samples, targets in zip(batch, batch_targets): 

@@ -325,22 +325,22 @@ def main(args):
 
     # get count stats
 
-    data_loader_train_stats = DataLoader(
-        train_set_stats,
-        batch_size=1)
-    count = []
-    train_iter = iter(data_loader_train_stats)
-    for i, classtype in enumerate(args.multiclass):
-        class_count = []
-        for batch in range(len(data_loader_train_stats)):
-            try: 
-                sample, target = next(train_iter)
-            except: pass
-            for x in target:
-                truth = (x["labels"] == i+1)
-                class_count.append(torch.sum(truth.int()).item())
-        count.append(sum(class_count))
-    print(count)
+    #    data_loader_train_stats = DataLoader(
+    #        train_set_stats,
+    #        batch_size=1)
+    #    count = []
+    #    train_iter = iter(data_loader_train_stats)
+    #    for i, classtype in enumerate(args.multiclass):
+    #        class_count = []
+    #        for batch in range(len(data_loader_train_stats)):
+    #            try: 
+    #                sample, target = next(train_iter)
+    #            except: pass
+    #            for x in target:
+    #                truth = (x["labels"] == i+1)
+    #                class_count.append(torch.sum(truth.int()).item())
+    #        count.append(sum(class_count))
+    #    print(count)
 
     data_loader_val = DataLoader(
         val_set,
@@ -464,7 +464,7 @@ def main(args):
         # run evaluation
         if epoch % args.eval_freq == 0 and epoch != 0:
             t1 = time.time()
-            result = evaluate_crowd_no_overlap(model, data_loader_val, device)
+            result = evaluate_crowd_no_overlap(model, data_loader_val, device, num_classes=args.num_classes)
             t2 = time.time()
 
             mae.append(result[0])
