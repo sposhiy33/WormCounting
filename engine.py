@@ -301,7 +301,7 @@ def evaluate_crowd_w_fine_grained(
             # logit[0] = 0
             class_labels[i] = logit.index(max(logit))
         class_labels = class_labels.numpy().tolist()
-        targets_labels = targets[0]["labels"].detach().numpy().tolist()
+        targets_labels = tGargets[0]["labels"].detach().numpy().tolist()
 
         # get L1 CounGts
         l1_count += len([i for i in class_labels if i == 1])
@@ -400,7 +400,9 @@ def evaluate_crowd_no_overlap(
         i_mae = sum(i_mae) / len(i_mae)
         i_mse = sum(i_mse) / len(i_mse)
         i_mse = math.sqrt(i_mse)
-        dist_list = sum(dist_list) / len(dist_list)
+        if len(dist_list) > 0:
+            dist_list = sum(dist_list) / len(dist_list)
+        else: dist_list = math.inf 
         class_mae.append(i_mae)
         class_mse.append(i_mse)
         class_dist.append(dist_list)
