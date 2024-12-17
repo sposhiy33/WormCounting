@@ -464,7 +464,9 @@ def main(args):
         # run evaluation
         if epoch % args.eval_freq == 0 and epoch != 0:
             t1 = time.time()
-            result = evaluate_crowd_no_overlap(model, data_loader_val, device, num_classes=args.num_classes)
+            result = evaluate_crowd_no_overlap(model, data_loader_val, device, 
+                                               num_classes=args.num_classes,
+                                               multiclass=(True if len(args.multiclass)>1 else False))
             t2 = time.time()
 
             mae.append(result[0])

@@ -1,5 +1,5 @@
 CUDA_VISIBLE_DEVICES=0 python train.py --expname $1 --data_root $2 \
-    --dataset_file WORM --multiclass L1 Gravid --num_classes 2 --ce_coef 0.7 1 \
+    --dataset_file WORM --multiclass L1 embryo --num_classes 2 --ce_coef 0.7 1 \
 	--epochs 150 \
     --lr_drop 150 \
     --output_dir ./results/ \
