@@ -488,6 +488,8 @@ def evaluate_crowd_no_overlap(
     count = np.array(count)
     final_gt_count = []
     final_count = []
+    print(gt_count)
+    print(count)
     for i in range(gt_count.shape[1]):
         final_gt_count.append(np.sum(gt_count[:, i]))
         final_count.append(np.sum(count[:, i]))

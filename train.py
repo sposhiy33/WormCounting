@@ -176,6 +176,11 @@ def get_args_parser():
         help="freeze regression branch during training",
     )
 
+    parser.add_argument("--noreg",
+        action="store_true",
+        help="set regression branch to zero, so that ground truth points are not offset,\
+                used for debugging pruposes")
+
     parser.add_argument("--eval", action="store_true")
     parser.add_argument("--num_workers", default=8, type=int)
     parser.add_argument(

@@ -223,8 +223,10 @@ class Decoder(nn.Module):
 
 # the defenition of the P2PNet model
 class P2PNet(nn.Module):
-    def __init__(self, backbone, num_classes, row=2, line=2):
+    def __init__(self, backbone, num_classes, noreg=False, row=2, line=2):
         super().__init__()
+        self.noreg = noreg
+
         self.backbone = backbone
         # number of classes in each logit, add one for no-person class.
         self.num_classes = num_classes + 1
@@ -261,7 +263,10 @@ class P2PNet(nn.Module):
         classification = self.classification(features_fpn[0])
         anchor_points = self.anchor_points(samples).repeat(batch_size, 1, 1)
         # decode the points as prediction
-        output_coord = regression + anchor_points
+        if self.noreg==True: 
+            output_coord = anchor_points
+        else: 
+            output_coord = regression + anchor_points
         output_class = classification
         out = {"pred_logits": output_class, "pred_points": output_coord}
 
@@ -721,7 +726,7 @@ def build_p2p(args, training):
     # treats persons as a single class
 
     backbone = build_backbone(args)
-    model = P2PNet(backbone, args.num_classes, args.row, args.line)
+    model = P2PNet(backbone, args.num_classes, args.noreg, args.row, args.line)
     if not training:
         return model
 
