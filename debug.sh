@@ -16,6 +16,5 @@ CUDA_VISIBLE_DEVICES=0 python train.py --expname $1 --data_root $2 \
 	--loss labels points \
 	--map_res 16 \
 	--gauss_kernel_res 21 \
-	--noreg
+	--pointmatch
 	# --resume results/multiclass_mixedimg/weights/best_mae.pth \
-	# --freeze_regression

@@ -1,5 +1,5 @@
-import datetime
 import argparse
+import datetime
 import os
 import random
 import time
@@ -8,9 +8,9 @@ from pathlib import Path
 
 import numpy
 import torch
-from torchinfo import summary 
 from tensorboardX import SummaryWriter
 from torch.utils.data import DataLoader, DistributedSampler
+from torchinfo import summary
 
 from crowd_datasets import build_dataset
 from engine import *
@@ -75,22 +75,38 @@ def get_args_parser():
         "--set_cost_point",
         default=0.05,
         type=float,
-        help="L1 point coefficient in the matching cost",
+        help="L1 point coefficient in the matching cot",
     )
 
-    parser.add_argument("--loss", nargs="+", type=str,
-                        help="specify which terms to include in the loss",
-                        default=["labels", "points"],
-                        choices=["labels", "points", "density", "count", "distance"])
+    parser.add_argument(
+        "--loss",
+        nargs="+",
+        type=str,
+        help="specify which terms to include in the loss",
+        default=["labels", "points"],
+        choices=["labels", "points", "density", "count", "distance"],
+    )
     # * Loss coefficients (guide training scheme)
     parser.add_argument("--point_loss_coef", default=0.0002, type=float)
-    
-    parser.add_argument("--dense_loss_coef", default=1, type=float,
-                        help="loss weight of dense estimation loss")
-    parser.add_argument("--count_loss_coef", default=1, type=float,
-                        help="loss weight of count estimation loss")
-    parser.add_argument("--distance_loss_coef", default=1, type=float,
-                        help="loss weight of distance regulation term")
+
+    parser.add_argument(
+        "--dense_loss_coef",
+        default=1,
+        type=float,
+        help="loss weight of dense estimation loss",
+    )
+    parser.add_argument(
+        "--count_loss_coef",
+        default=1,
+        type=float,
+        help="loss weight of count estimation loss",
+    )
+    parser.add_argument(
+        "--distance_loss_coef",
+        default=1,
+        type=float,
+        help="loss weight of distance regulation term",
+    )
 
     parser.add_argument(
         "--eos_coef",
@@ -106,10 +122,17 @@ def get_args_parser():
     )
 
     parser.add_argument(
-        "--map_res", default=4, type=int, help="resoltion down sampling factor (each axis), total downsample will be map_res^2"
+        "--map_res",
+        default=4,
+        type=int,
+        help="resoltion down sampling factor (each axis), total downsample will be map_res^2",
     )
-    parser.add_argument("--gauss_kernel_res", default=9, type=int,
-                        help="kernel size for generating heatmaps")
+    parser.add_argument(
+        "--gauss_kernel_res",
+        default=9,
+        type=int,
+        help="kernel size for generating heatmaps",
+    )
 
     parser.add_argument(
         "--row", default=3, type=int, help="row number of anchor points"
@@ -170,16 +193,19 @@ def get_args_parser():
     parser.add_argument(
         "--start_epoch", default=0, type=int, metavar="N", help="start epoch"
     )
+
     parser.add_argument(
-        "--freeze_regression",
+        "--pointmatch",
         action="store_true",
-        help="freeze regression branch during training",
+        help="only use point distance as the hungarian alg metric"
     )
 
-    parser.add_argument("--noreg",
+    parser.add_argument(
+        "--noreg",
         action="store_true",
         help="set regression branch to zero, so that ground truth points are not offset,\
-                used for debugging pruposes")
+                used for debugging pruposes",
+    )
 
     parser.add_argument("--eval", action="store_true")
     parser.add_argument("--num_workers", default=8, type=int)
@@ -243,7 +269,7 @@ def main(args):
     criterion.to(device)
 
     model_without_ddp = model
-    
+
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print("number of params:", n_parameters)
     # use different optimation params for different parts of the model
@@ -300,8 +326,7 @@ def main(args):
         patch=True,
     )
 
-
-    train_set_stats, val_set_stats = loading_data( 
+    train_set_stats, val_set_stats = loading_data(
         args.data_root,
         multiclass=args.multiclass,
         class_filter=args.class_filter,
@@ -310,7 +335,6 @@ def main(args):
         edges=args.edges,
         patch=False,
     )
-
 
     # create the sampler used during training
     sampler_train = torch.utils.data.RandomSampler(train_set)
@@ -327,7 +351,6 @@ def main(args):
         num_workers=args.num_workers,
     )
 
-
     # get count stats
 
     #    data_loader_train_stats = DataLoader(
@@ -338,7 +361,7 @@ def main(args):
     #    for i, classtype in enumerate(args.multiclass):
     #        class_count = []
     #        for batch in range(len(data_loader_train_stats)):
-    #            try: 
+    #            try:
     #                sample, target = next(train_iter)
     #            except: pass
     #            for x in target:
@@ -382,12 +405,12 @@ def main(args):
             "=======================================test======================================="
         )
 
-    if args.freeze_regression:
+    if args.noreg:
         for params in model.regression.parameters():
             params.requires_grad = False
         model.regression.eval()
 
-    print(summary(model, input_size=(4,3,512,512)))
+    print(summary(model, input_size=(4, 3, 512, 512)))
 
     print("Start training")
     start_time = time.time()
@@ -469,9 +492,13 @@ def main(args):
         # run evaluation
         if epoch % args.eval_freq == 0 and epoch != 0:
             t1 = time.time()
-            result = evaluate_crowd_no_overlap(model, data_loader_val, device, 
-                                               num_classes=args.num_classes,
-                                               multiclass=(True if len(args.multiclass)>1 else False))
+            result = evaluate_crowd_no_overlap(
+                model,
+                data_loader_val,
+                device,
+                num_classes=args.num_classes,
+                multiclass=(True if len(args.multiclass) > 1 else False),
+            )
             t2 = time.time()
 
             mae.append(result[0])

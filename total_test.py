@@ -73,6 +73,13 @@ def get_arg_parser():
         help="equally partition the image (for test time)",
     )
 
+    parser.add_argument("--noreg",
+        action="store_true",
+        help="set regression branch to zero, so that ground truth points are not offset,\
+                used for debugging pruposes")
+
+
+
     ## throwaway args
     parser.add_argument("--batch_size", default=8, type=int)
     parser.add_argument("--num_workers", default=8, type=int)
