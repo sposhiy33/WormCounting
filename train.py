@@ -197,7 +197,7 @@ def get_args_parser():
     parser.add_argument(
         "--pointmatch",
         action="store_true",
-        help="only use point distance as the hungarian alg metric"
+        help="only use point distance as the hungarian alg metric",
     )
 
     parser.add_argument(
