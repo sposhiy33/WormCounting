@@ -85,7 +85,6 @@ class HungarianMatcher_Crowd(nn.Module):
         # Final cost matrix
         if self.pointmatch:
             C = cost_point
-            print("point match")
         else:
             C = self.cost_point * cost_point + self.cost_class * cost_class
         C = C.view(bs, num_queries, -1).cpu()
