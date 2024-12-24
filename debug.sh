@@ -13,8 +13,9 @@ CUDA_VISIBLE_DEVICES=0 python train.py --expname $1 --data_root $2 \
 	--count_loss_coef 10.0 \
 	--dense_loss_coef 1.0 \
 	--distance_loss_coef 1.0 \
-	--loss labels points \
+	--loss labels \
 	--map_res 16 \
 	--gauss_kernel_res 21 \
-	--pointmatch
+	--pointmatch \
+	--linear
 	# --resume results/multiclass_mixedimg/weights/best_mae.pth \

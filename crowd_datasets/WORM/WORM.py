@@ -17,6 +17,7 @@ class WORM(Dataset):
     def __init__(
         self,
         data_root,
+        num_patches,
         transform=None,
         train=False,
         scale=False,
@@ -75,6 +76,7 @@ class WORM(Dataset):
         self.hsv = hsv
         self.hse = hse
         self.edges = edges
+        self.num_patches = num_patches
 
     def __len__(self):
         return self.nSamples
@@ -86,7 +88,8 @@ class WORM(Dataset):
         gt_path = self.img_map[img_path]
         # load image and ground truth
         img, point, labels = load_data(
-            (img_path, gt_path), self.train, self.multiclass, self.class_filter
+            (img_path, gt_path), self.train, self.multiclass, self.class_filter,
+            num_patches = self.num_patches
         )
 
         if self.edges:

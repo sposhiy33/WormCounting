@@ -249,13 +249,15 @@ class LinearModel(nn.Module):
         classification = self.classification(features_fpn[0])
         anchor_points = self.anchor_points(samples).repeat(batch_size, 1, 1)
     
-        print(classification.size())
             
         # decode the points as prediction
         output_coord = anchor_points
         output_class = classification
+
         out = {"pred_logits": output_class, "pred_points": output_coord}
 
+        import pdb; pdb.set_trace()
+    
         return out
 
 def build_linear(args, training):

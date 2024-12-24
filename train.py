@@ -149,6 +149,9 @@ def get_args_parser():
         help="path where the dataset is",
     )
 
+    parser.add_argument("--num_patches", default=4,
+                        help="number of patches to extract from each image")
+
     parser.add_argument(
         "--expname",
         type=str,
@@ -269,6 +272,7 @@ def main(args):
     # get the P2PNet model
     model, criterion = build_model(args, training=True)
     # send model and criterion to GPU
+    print(device)
     model.to(device)
     criterion.to(device)
 
@@ -328,6 +332,7 @@ def main(args):
         hse=args.hse,
         edges=args.edges,
         patch=True,
+        num_patches=self.num_patches
     )
 
     train_set_stats, val_set_stats = loading_data(

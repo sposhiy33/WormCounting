@@ -13,6 +13,7 @@ def loading_data(
     hse=False,
     edges=False,
     patch=False,
+    num_patches: int = 4
 ):
 
     # the pre-proccssing transform
@@ -40,6 +41,7 @@ def loading_data(
         hsv=hsv,
         hse=hse,
         edges=edges,
+        num_patches=num_patches,
     )
     val_set = WORM(
         data_root,

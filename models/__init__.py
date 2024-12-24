@@ -1,4 +1,5 @@
 from .p2pnet import build_p2p, build_multiclass
+from .linear import build_linear
 # build the P2PNet model
 # set training to 'True' during training
 def build_model(args, training=False):
