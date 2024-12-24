@@ -207,6 +207,10 @@ def get_args_parser():
                 used for debugging pruposes",
     )
 
+    parser.add_argument("--linear",
+                        action="store_true",
+                        help="use a fully connected networrk for classification")
+
     parser.add_argument("--eval", action="store_true")
     parser.add_argument("--num_workers", default=8, type=int)
     parser.add_argument(

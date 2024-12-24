@@ -1,3 +1,10 @@
+"""
+Implementation of vanilla P2P Net
+Implements model architecutre and loss formulation
+Introduced some archtecutre changes and additional loss terms
+"""
+
+
 import time
 
 import matplotlib.pyplot as plt
@@ -33,7 +40,7 @@ class RegressionModel(nn.Module):
 
         self.output = nn.Conv2d(
             feature_size, num_anchor_points * 2, kernel_size=3, padding=1
-        )
+        ) 
 
     # sub-branch forward
     def forward(self, x):
@@ -84,13 +91,13 @@ class ClassificationModel(nn.Module):
 
     # sub-branch forward
     def forward(self, x):
-        out = self.conv1(x)
-        out = self.act1(out)
+        out_1 = self.conv1(x)
+        out_1 = self.act1(out_1)
 
-        out = self.conv2(out)
-        out = self.act2(out)
+        out_2 = self.conv2(out_1)
+        out_2 = self.act2(out_2)
 
-        out = self.output(out)
+        out = self.output(out_2)
 
         out1 = out.permute(0, 2, 3, 1)
 
@@ -99,8 +106,8 @@ class ClassificationModel(nn.Module):
         out2 = out1.view(
             batch_size, width, height, self.num_anchor_points, self.num_classes
         )
-
-        return out2.contiguous().view(x.shape[0], -1, self.num_classes)
+        import pdb; pdb.set_trace()
+        return out2.contiguous().view(x.shape[0], -1, s048-elf.num_classes)
 
 
 # generate the reference points in grid layout
@@ -269,6 +276,9 @@ class P2PNet(nn.Module):
             output_coord = regression + anchor_points
         output_class = classification
         out = {"pred_logits": output_class, "pred_points": output_coord}
+
+        # set trace
+        # import pdb; pdb.set_trace()
 
         return out
 
@@ -752,7 +762,7 @@ def build_p2p(args, training):
 
     return model, criterion
 
-
+## 
 def build_multiclass(args, training):
 
     backbone = build_backbone(args)

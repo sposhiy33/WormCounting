@@ -19,6 +19,7 @@ def loading_data(
     transform = standard_transforms.Compose(
         [
             standard_transforms.ToTensor(),
+            standard_transforms.Resize(size=(1024,1024)), # standardize input sizes()
             standard_transforms.Normalize(
                 mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
             ),
