@@ -78,7 +78,7 @@ class ClassificationModel(nn.Module):
         self.act4 = nn.ReLU()
 
         self.output = nn.Conv2d(
-            feature_size, num_anchor_points * num_classes, kernel_size=3, padding=1
+            feature_size, num_anchor_points * num_classes, kernel_size=7, padding=3
         )
         self.output_act = nn.Sigmoid()
 
