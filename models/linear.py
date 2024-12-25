@@ -48,21 +48,21 @@ class ClassificationModel(nn.Module):
 
         self.conv1 = nn.Conv2d(num_features_in, feature_size, kernel_size=3, padding=1)
         self.act1 = nn.ReLU()
-
+        print("conv_1")
         self.conv2 = nn.Conv2d(feature_size, feature_size, kernel_size=3, padding=1)
         self.act2 = nn.ReLU()
-
+        print("conv_2")
         self.conv3 = nn.Conv2d(feature_size, feature_size, kernel_size=3, padding=1)
         self.act3 = nn.ReLU()
-
+        print("conv_3")
         self.conv4 = nn.Conv2d(feature_size, feature_size, kernel_size=3, padding=1)
         self.act4 = nn.ReLU()
-
+        print("conv_4")
         # basically a fully connceted layer
         self.output = nn.Conv2d(
             feature_size, 128*128*self.num_anchor_points, kernel_size=128)
         # the final output size will be: [# proposal points, 1]
-
+        print("output")
         self.output_act = nn.Sigmoid()
 
 
@@ -74,9 +74,9 @@ class ClassificationModel(nn.Module):
 
         out = self.conv2(out)
         out = self.act2(out)
-
+        print(out.size())
         out = self.output(out)
-
+        print(out.size())
         out1 = out.permute(0, 2, 3, 1)
 
         batch_size, width, height, _ = out1.shape
