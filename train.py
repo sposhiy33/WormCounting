@@ -150,6 +150,7 @@ def get_args_parser():
     )
 
     parser.add_argument("--num_patches", default=4,
+                        type=int,
                         help="number of patches to extract from each image")
 
     parser.add_argument(
@@ -210,6 +211,12 @@ def get_args_parser():
                 used for debugging pruposes",
     )
 
+    parser.add_argument(
+        "--classifier",
+        action="store_true",
+        help="create a classifier only model, fine grained regression branch is not created"
+    )
+        
     parser.add_argument("--linear",
                         action="store_true",
                         help="use a fully connected networrk for classification")
@@ -332,7 +339,7 @@ def main(args):
         hse=args.hse,
         edges=args.edges,
         patch=True,
-        num_patches=self.num_patches
+        num_patches=args.num_patches
     )
 
     train_set_stats, val_set_stats = loading_data(
@@ -451,13 +458,15 @@ def main(args):
             with open(run_log_name, "a") as log_file:
                 log_file.write("loss/loss@{}: {}".format(epoch, stat["loss"]))
                 log_file.write("loss/loss_ce@{}: {}".format(epoch, stat["loss_ce"]))
-                log_file.write(
-                    "loss/loss_point@{}: {}".format(epoch, stat["loss_point"])
-                )
+                if "points" in args.loss:
+                    log_file.write(
+                        "loss/loss_point@{}: {}".format(epoch, stat["loss_point"])
+                        )
             writer.add_scalar("loss/loss", stat["loss"], epoch)
             writer.add_scalar("loss/loss_ce", stat["loss_ce"], epoch)
-            writer.add_scalar("loss/loss_point", stat["loss_point"], epoch)
-            if len(args.loss) > 2:
+            if "points" in args.loss:
+                writer.add_scalar("loss/loss_point", stat["loss_point"], epoch)
+            if "density" in args.loss:
                 writer.add_scalar("loss/loss_dense", stat["loss_dense"], epoch)
         t2 = time.time()
         print(
@@ -560,6 +569,8 @@ def main(args):
     print("Training time {}".format(total_time_str))
 
 
+# <<TODO>> make this script geenralizable to any loss dictionary it is given,
+#          regardless of the number of loss terms
 def avg_class_loss(loss, writer, epoch):
     ce_losses = []
     point_losses = []
@@ -570,7 +581,12 @@ def avg_class_loss(loss, writer, epoch):
         ce_losses.append(ce_list)
 
         # calculate point losses
-        point_list = entry["class_loss_point"]
+        # in the case that point losses are not included, do try catch
+        
+        try: 
+            point_list = entry["class_loss_point"]
+        except:
+            point_list = [torch.tensor(0)] # initialize an empty tensor 
         point_list = [i.item() for i in point_list]
         point_losses.append(point_list)
 

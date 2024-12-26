@@ -109,4 +109,4 @@ def build_matcher_crowd(args, override_multiclass: bool = False):
         cost_point=args.set_cost_point,
         override_multiclass=override_multiclass,
         pointmatch=args.pointmatch,
-    )
+   )

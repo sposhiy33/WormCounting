@@ -72,20 +72,14 @@ class ClassificationModel(nn.Module):
         self.num_classes = num_classes
         self.num_anchor_points = num_anchor_points
 
-        self.conv1 = nn.Conv2d(num_features_in, feature_size, kernel_size=3, padding=1)
+        self.conv1 = nn.Conv2d(num_features_in, feature_size, kernel_size=7, padding=2)
         self.act1 = nn.ReLU()
 
-        self.conv2 = nn.Conv2d(feature_size, feature_size, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(feature_size, feature_size, kernel_size=7, padding=2)
         self.act2 = nn.ReLU()
 
-        self.conv3 = nn.Conv2d(feature_size, feature_size, kernel_size=3, padding=1)
-        self.act3 = nn.ReLU()
-
-        self.conv4 = nn.Conv2d(feature_size, feature_size, kernel_size=3, padding=1)
-        self.act4 = nn.ReLU()
-
         self.output = nn.Conv2d(
-            feature_size, num_anchor_points * num_classes, kernel_size=3, padding=1
+            feature_size, num_anchor_points * num_classes, kernel_size=7, padding=2
         )
         self.output_act = nn.Sigmoid()
 
@@ -281,119 +275,6 @@ class P2PNet(nn.Module):
         # import pdb; pdb.set_trace()
 
         return out
-
-
-class FineClassifier(nn.Module):
-    """Create fine grained classifier for p2p net point proposals"""
-
-    def __init__(self, backbone, num_classes, row=2, line=2):
-        super().__init__()
-
-        self.vgg_backbone = backbone
-        self.num_classes = num_classes
-        self.row = row
-        self.line = line
-
-        num_anchor_points = row * line
-
-        self.classification = ClassificationModel(
-            num_features_in=256,
-            num_classes=self.num_classes,
-            num_anchor_points=num_anchor_points,
-        )
-        self.fpn = Decoder(256, 512, 512)
-
-    def forward(self, samples: NestedTensor):
-        # get the backbone (vgg) features
-        features = self.vgg_backbone(samples)
-        # construct the feature space
-        features_fpn = self.fpn([features[1], features[2], features[3]])
-        batch_size = features[0].shape[0]
-
-        # pass through the classifer
-        classification = self.classification(features_fpn[1])
-        output_class = classification
-
-        out = {"pred_logits": output_class}
-
-        return out
-
-
-"""
-Create objective function that does classification only from the grid of points
-"""
-
-
-class SetCriterion_Classification(nn.Module):
-
-    def __init__(self, matcher, num_classes, eos_coef, ce_coef):
-        super().__init__()
-        self.matcher = matcher  # this is the same matcher used in the P2P step
-        self.num_classes = num_classes
-        empty_weight = torch.ones(num_classes)
-        empty_weight[0] = eos_coef
-        for i, weight in enumerate(ce_coef):
-            empty_weight[i + 1] = weight
-        self.register_buffer("empty_weight", empty_weight)
-
-    def loss_labels(self, outputs, targets, indices, num_points):
-        """CE Loss: between each point proposal and corresponding ground truth point"""
-        # calculate the point proposals from each input patch
-        assert "pred_logits" in outputs
-        src_logits = outputs["pred_logits"]
-
-        idx = self._get_src_permutation_idx(indices)
-        target_classes_o = torch.cat(
-            [t["labels"][J] for t, (_, J) in zip(targets, indices)]
-        )
-        target_classes = torch.full(
-            src_logits.shape[:2], 0, dtype=torch.int64, device=src_logits.device
-        )
-
-        target_classes[idx] = target_classes_o
-
-        loss_ce = F.cross_entropy(
-            src_logits.transpose(1, 2), target_classes, self.empty_weight
-        )
-        losses = {"loss_ce": loss_ce}
-
-        return losses
-
-    def _get_src_permutation_idx(self, indices):
-        # permute predictions following indices
-        batch_idx = torch.cat(
-            [torch.full_like(src, i) for i, (src, _) in enumerate(indices)]
-        )
-        src_idx = torch.cat([src for (src, _) in indices])
-        return batch_idx, src_idx
-
-    def _get_tgt_permutation_idx(self, indices):
-        # permute targets following indices
-        batch_idx = torch.cat(
-            [torch.full_like(tgt, i) for i, (_, tgt) in enumerate(indices)]
-        )
-        tgt_idx = torch.cat([tgt for (_, tgt) in indices])
-        return batch_idx, tgt_idx
-
-    def forward(self, outputs, regression_outputs, targets):
-        """loss computation"""
-        regression_outputs = {
-            "pred_logits": regression_outputs["pred_logits"],
-            "pred_points": regression_outputs["pred_points"],
-        }
-        indicies = self.matcher(regression_outputs, targets)
-
-        num_points = sum(len(t["labels"]) for t in targets)
-        num_points = torch.as_tensor(
-            [num_points],
-            dtype=torch.float,
-            device=next(iter(regression_outputs.values())).device,
-        )
-
-        losses = {}
-        losses.update(self.loss_labels(outputs, targets, indicies, num_points))
-
-        return losses
 
 
 """
@@ -758,25 +639,6 @@ def build_p2p(args, training):
         map_res=args.map_res,
         gauss_kernel_res=args.gauss_kernel_res,
         losses=losses,
-    )
-
-    return model, criterion
-
-## 
-def build_multiclass(args, training):
-
-    backbone = build_backbone(args)
-    model = FineClassifier(backbone, args.downstream_num_classes, args.row, args.line)
-    if not training:
-        return model
-
-    # build the matcher based on original P2P model
-    matcher = build_matcher_crowd(args, override_multiclass=True)
-    criterion = SetCriterion_Classification(
-        matcher=matcher,
-        num_classes=args.downstream_num_classes,
-        eos_coef=args.eos_coef,
-        ce_coef=args.ce_coef,
     )
 
     return model, criterion

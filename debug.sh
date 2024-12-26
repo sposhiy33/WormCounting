@@ -6,6 +6,7 @@ CUDA_VISIBLE_DEVICES=0 python train.py --expname $1 --data_root $2 \
     --lr 0.0001 \
     --lr_backbone 0.00001 \
     --batch_size 1 \
+	--num_patches 1 \
     --eval_freq 1 \
     --gpu_id 0 \
     --row 1	--line 1 \
@@ -17,5 +18,5 @@ CUDA_VISIBLE_DEVICES=0 python train.py --expname $1 --data_root $2 \
 	--map_res 16 \
 	--gauss_kernel_res 21 \
 	--pointmatch \
-	--linear
+	--classifier
 	# --resume results/multiclass_mixedimg/weights/best_mae.pth \

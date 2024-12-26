@@ -17,7 +17,7 @@ class WORM(Dataset):
     def __init__(
         self,
         data_root,
-        num_patches,
+        num_patches:int=4,
         transform=None,
         train=False,
         scale=False,
@@ -89,7 +89,6 @@ class WORM(Dataset):
         # load image and ground truth
         img, point, labels = load_data(
             (img_path, gt_path), self.train, self.multiclass, self.class_filter,
-            num_patches = self.num_patches
         )
 
         if self.edges:
@@ -114,7 +113,9 @@ class WORM(Dataset):
 
         # crop augumentaiton
         if self.train and self.patch:
-            img, point, labels = random_crop(img, point, labels)
+
+            img, point, labels = random_crop(img, point, labels,
+                                             num_patch=self.num_patches)
 
             # convert point arrays for each image to torch Tensor type
             for i, _ in enumerate(point):
@@ -465,16 +466,14 @@ def equal_crop(img, den, labels, num_patches: int = 4):
 
 
 # random crop augumentation
-def random_crop(img, den, labels, edge_image = None, num_patch: int = 4):
+def random_crop(img, den, labels, num_patch: int = 4):
 
     # try to use 256 * 256 resolution
     half_h = 512
     half_w = 512
     # half_h = img.size()[1]//4
     # half_w = img.size()[2]//4
-    if edge_image == None:
-        result_img = np.zeros([num_patch, img.shape[0], half_h, half_w])
-    else: result_img = np.zeros([num_patch*2, img.shape[0], half_h, half_w]) 
+    result_img = np.zeros([num_patch, img.shape[0], half_h, half_w]) 
     result_den = []
     result_lab = []
     
