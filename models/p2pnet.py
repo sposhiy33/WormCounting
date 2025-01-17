@@ -65,14 +65,14 @@ class ClassificationModel(nn.Module):
         self.num_classes = num_classes
         self.num_anchor_points = num_anchor_points
 
-        self.conv1 = nn.Conv2d(num_features_in, feature_size, kernel_size=7, padding=3)
+        self.conv1 = nn.Conv2d(num_features_in, feature_size, kernel_size=3, padding=1)
         self.act1 = nn.ReLU()
 
-        self.conv2 = nn.Conv2d(feature_size, feature_size, kernel_size=7, padding=3)
+        self.conv2 = nn.Conv2d(feature_size, feature_size, kernel_size=3, padding=1)
         self.act2 = nn.ReLU()
         
         self.output = nn.Conv2d(
-            feature_size, num_anchor_points * num_classes, kernel_size=7, padding=3
+            feature_size, num_anchor_points * num_classes, kernel_size=3, padding=1
         )
         self.output_act = nn.Sigmoid()
 
