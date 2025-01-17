@@ -746,8 +746,6 @@ def build_p2p(args, training):
 
     return model, criterion
 
-def build_classification(args,training)
-
 
 def build_multiclass(args, training):
 
