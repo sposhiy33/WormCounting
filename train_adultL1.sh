@@ -9,7 +9,7 @@ CUDA_VISIBLE_DEVICES=0 python train.py --expname $1 --data_root $2 \
     --eval_freq 1 \
     --gpu_id 1 \
     --row 1	--line 1 \
-	--point_loss_coef 0.0 \
+	--point_loss_coef 0.01 \
 	--count_loss_coef 10.0 \
 	--dense_loss_coef 1.0 \
 	--distance_loss_coef 1.0 \
