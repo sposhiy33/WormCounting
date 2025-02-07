@@ -87,7 +87,20 @@ def get_args_parser():
         choices=["labels", "points", "density", "count", "distance"],
     )
     # * Loss coefficients (guide training scheme)
-    parser.add_argument("--point_loss_coef", default=0.0002, type=float)
+    
+    parser.add_argument(
+        "--label_loss_coef",
+        default=1,
+        type=float,
+        help="loss weight of CE loss"
+    )
+    
+    parser.add_argument(
+        "--point_loss_coef", 
+        default=0.0002, 
+        type=float,
+        help="loss weight of regression loss"
+    )
 
     parser.add_argument(
         "--dense_loss_coef",
@@ -185,6 +198,9 @@ def get_args_parser():
     parser.add_argument(
         "--edges", action="store_true", help="use Canny edge output during training"
     )
+    parser.add_argument(
+        "--num_patches", type=int, default=4, help="number of patches to samples from each image"
+    )
 
     parser.add_argument("--seed", default=42, type=int)
     parser.add_argument(
@@ -205,6 +221,12 @@ def get_args_parser():
         action="store_true",
         help="set regression branch to zero, so that ground truth points are not offset,\
                 used for debugging pruposes",
+    )
+
+    parser.add_argument(
+        "--classifier",
+        action="store_true",
+        help="option to intialize network with only the classifiation branch"
     )
 
     parser.add_argument("--eval", action="store_true")
@@ -441,14 +463,22 @@ def main(args):
         if writer is not None:
             with open(run_log_name, "a") as log_file:
                 log_file.write("loss/loss@{}: {}".format(epoch, stat["loss"]))
-                log_file.write("loss/loss_ce@{}: {}".format(epoch, stat["loss_ce"]))
-                log_file.write(
-                    "loss/loss_point@{}: {}".format(epoch, stat["loss_point"])
-                )
+                if "labels" in args.loss:
+                    log_file.write("loss/loss_ce@{}: {}".format(epoch, stat["loss_ce"]))
+                if "point" in args.loss:
+                    log_file.write(
+                        "loss/loss_point@{}: {}".format(epoch, stat["loss_point"])
+                    )
+                if "density" in args.loss:
+                    log_file.write(
+                        "loss/loss_dense@{}: {}".format(epoch, stat["loss_dense"])
+                    )    
             writer.add_scalar("loss/loss", stat["loss"], epoch)
-            writer.add_scalar("loss/loss_ce", stat["loss_ce"], epoch)
-            writer.add_scalar("loss/loss_point", stat["loss_point"], epoch)
-            if len(args.loss) > 2:
+            if "labels" in args.loss:
+                writer.add_scalar("loss/loss_ce", stat["loss_ce"], epoch)
+            if "point" in args.loss:
+                writer.add_scalar("loss/loss_point", stat["loss_point"], epoch)
+            if "density" in args.loss:
                 writer.add_scalar("loss/loss_dense", stat["loss_dense"], epoch)
         t2 = time.time()
         print(
@@ -484,10 +514,10 @@ def main(args):
             min_loss = np.min(loss)
 
         # run classwise loss evaluation
-        avg_class = avg_class_loss(class_stat, writer, epoch)
-        print(
-            f"Avg Classwise loss:     loss_ce: {avg_class[0]}     loss_point: {avg_class[1]}"
-        )
+        # avg_class = avg_class_loss(class_stat, writer, epoch)
+        # print(
+        #     f"Avg Classwise loss:     loss_ce: {avg_class[0]}     loss_point: {avg_class[1]}"
+        # )
 
         # run evaluation
         if epoch % args.eval_freq == 0 and epoch != 0:
