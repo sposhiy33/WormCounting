@@ -275,7 +275,7 @@ def evaluate_crowd_w_fine_grained(
         classification_score = torch.nn.functional.softmax(classification_score, -1)
         gt_cnt = targets[0]["point"].shape[0]
         # regression threshold
-        threshold = 0.5
+        threshold = 0.4
 
         # pick out point proposals
         points = (

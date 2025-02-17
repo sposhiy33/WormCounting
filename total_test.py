@@ -77,6 +77,12 @@ def get_arg_parser():
         action="store_true",
         help="set regression branch to zero, so that ground truth points are not offset,\
                 used for debugging pruposes")
+    
+    parser.add_argument(
+        "--classifier",
+        action="store_true",
+        help="option to intialize network with only the classifiation branch"
+    )
 
 
 
@@ -117,9 +123,10 @@ def main(args):
     # list of datasets to evaluate
     dataset_list = {
         # "MULTICLASS": "dataroot/resize_multiclass",
-        # "L1": "dataroot/resize_L1",
-        # "ADULT": "dataroot/worm_dataset",
-        "MIXED": "dataroot/resize_mixed_eval",
+        #"L1": "dataroot/resize_L1",
+        #"ADULT": "dataroot/worm_dataset",
+        "MIXED": "dataroot/lowres_all_images",
+
     }
     
     if args.val_set == None:

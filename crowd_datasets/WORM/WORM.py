@@ -51,14 +51,20 @@ class WORM(Dataset):
         # loads the image/gt pairs
         for _, train_list in enumerate(self.img_list_file):
             train_list = train_list.strip()
+            # only go use images that have the desired class in the model
             with open(os.path.join(self.root_path, train_list)) as fin:
                 for line in fin:
+                    # length of the line must be two
                     if len(line) < 2:
                         continue
                     line = line.strip().split()
-                    self.img_map[os.path.join(self.root_path, line[0].strip())] = (
-                        os.path.join(self.root_path, line[1].strip())
-                    )
+                    ### only add to image map, if the image has any one of the classes
+                    if any(cls in line[0] for cls in multiclass):
+                        self.img_map[os.path.join(self.root_path, line[0].strip())] = (
+                                os.path.join(self.root_path, line[1].strip())
+                            )
+
+        
         self.img_list = sorted(list(self.img_map.keys()))
         # number of samples
         self.nSamples = len(self.img_list)
@@ -81,7 +87,7 @@ class WORM(Dataset):
 
     def __getitem__(self, index):
         assert index <= len(self), "index range error"
-
+        
         img_path = self.img_list[index]
         gt_path = self.img_map[img_path]
         # load image and ground truth
@@ -165,10 +171,11 @@ def load_data(img_gt_path, train, multiclass, class_filter):
     # load ground truth points
     points = []
 
+    classes = ["L1", "Gravid", "embryo"]    
     # assign a class
     labels = []
     with open(gt_path) as f_label:
-        for line in f_label:
+        for line in f_label: 
             if "\t" in line:
                 elements = len(line.strip().split("\t"))
                 x = float(line.strip().split("\t")[0].strip())
@@ -176,24 +183,33 @@ def load_data(img_gt_path, train, multiclass, class_filter):
                 lab = str(line.strip().split("\t")[2].strip())
                 points.append([x, y])
                 # create labels
-                if lab in multiclass:
-                    index = multiclass.index(lab)
+                if lab in classes:
+                    index = classes.index(lab)
                     labels.append(index+1)
                 
             else:
-                x = float(line.strip().split(" ")[0].replace(",", ""))
-                y = float(line.strip().split(" ")[1])
-                labels.append(2)
-                points.append([x, y])
+                raise Exception("proposal points are not in the correct format. \
+                                 Each line should be of format: X Y Class" )
 
-    if class_filter != None:
+    # class indicies used for training in reference to the 
+    mult_lab = [classes.index(class_lab)+1 for class_lab in multiclass]    # filter labels to only use labels specified in args.multiclass
+    remove_list = []
 
-        class_filter_mask = []
-        for i in labels:
-            if i == multiclass.index(class_filter) + 1 : class_filter_mask.append(True)
-            else: class_filter_mask.append(False)
-        labels = [1 for keep, i in zip(class_filter_mask, labels) if keep]
-        points = [i for keep, i in zip(class_filter_mask, points) if keep]
+    for i, lab in enumerate(labels):
+        # remove all the labels that are not in the multiclass
+        if lab not in mult_lab:
+            remove_list.append(i)
+
+        # convert to multiclass labels:
+        if lab in mult_lab:
+            labels[i] = mult_lab.index(lab) + 1
+
+    # remove all the labels that are not in the multiclass      
+    # at the end of the loop, finally remove all the labels that are not in the multiclass
+    for ind in sorted(remove_list, reverse=True):
+        del labels[ind]
+        del points[ind]
+
     return img, np.array(points), np.array(labels)
 
 
@@ -478,7 +494,7 @@ def random_crop(img, den, labels, edge_image = None, num_patch: int = 4):
     # crop num_patch for each image
     # keep sampling patches until all have non-zero number of samples in them (hence the while loop)
     current_count = 0
-
+            
     while current_count < num_patch:
         start_h = random.randint(0, img.size(1) - half_h)
         start_w = random.randint(0, img.size(2) - half_w)
@@ -497,8 +513,9 @@ def random_crop(img, den, labels, edge_image = None, num_patch: int = 4):
             record_lab = labels[idx]
         else:
             record_den = den
+
         # gaurentee that each patch sample has point in it 
-        
+        # if so then proceed with sampling the patch from the image
         if len(record_den) > 0:
             # copy the cropped rect
             result_img[current_count] = img[:, start_h:end_h, start_w:end_w]
