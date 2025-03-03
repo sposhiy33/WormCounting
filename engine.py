@@ -209,6 +209,7 @@ def train_one_epoch(
             for k, v in loss_dict_reduced.items()
             if k in weight_dict
         }
+ 
         losses_reduced_scaled = sum(loss_dict_reduced_scaled.values())
 
         loss_value = losses_reduced_scaled.item()
@@ -275,7 +276,7 @@ def evaluate_crowd_w_fine_grained(
         classification_score = torch.nn.functional.softmax(classification_score, -1)
         gt_cnt = targets[0]["point"].shape[0]
         # regression threshold
-        threshold = 0.4
+        threshold = 0.5
 
         # pick out point proposals
         points = (
@@ -318,7 +319,7 @@ def evaluate_crowd_w_fine_grained(
 # the inference routine for p2p net
 @torch.no_grad()
 def evaluate_crowd_no_overlap(
-    model, data_loader, device, vis_dir=None, multiclass=False, num_classes=None
+    model, data_loader, device, vis_dir=None, multiclass=None, num_classes=None
 ):
     model.eval()
 
@@ -342,7 +343,7 @@ def evaluate_crowd_no_overlap(
         i_mse = []
         dist_list = []
         for batch, batch_targets in data_loader:
-            for samples, targets in zip(batch, batch_targets): 
+            for samples, targets in zip(batch, batch_targets):
                 samples = samples.to(device)
                 samples = samples.unsqueeze(0)
                 # print(f"Samples: {samples.size()}")
@@ -431,7 +432,7 @@ def evaluate_crowd_no_overlap(
 
             predict_cnt = 0
 
-            if multiclass:
+            if len(multiclass)>0:
                 # iterate over each of the classes
                 target_count = []
                 proposal_count = []

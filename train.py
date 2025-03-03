@@ -199,6 +199,10 @@ def get_args_parser():
         "--edges", action="store_true", help="use Canny edge output during training"
     )
     parser.add_argument(
+        "--sharpness", action="store_true", help="use sharpened image during training"
+    )
+
+    parser.add_argument(
         "--num_patches", type=int, default=4, help="number of patches to samples from each image"
     )
 
@@ -345,6 +349,7 @@ def main(args):
         hsv=args.hsv,
         hse=args.hse,
         edges=args.edges,
+        sharpness=args.sharpness,
         patch=True,
     )
 
@@ -355,6 +360,7 @@ def main(args):
         hsv=args.hsv,
         hse=args.hse,
         edges=args.edges,
+        sharpness=args.sharpness,
         patch=False,
     )
 
@@ -527,7 +533,7 @@ def main(args):
                 data_loader_val,
                 device,
                 num_classes=args.num_classes,
-                multiclass=(True if len(args.multiclass) > 1 else False),
+                multiclass=args.multiclass,
             )
             t2 = time.time()
 

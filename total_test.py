@@ -39,7 +39,7 @@ def get_arg_parser():
         "--num_classes", type=int, default=1, help="number of non no-person classes"
     )
     parser.add_argument("--dataroot", type=str)
-    parser.add_argument("--dataset_file", default="WORM_VAL")
+    parser.add_argument("--dataset_file", default="WORM")
     
     parser.add_argument(
         "--multiclass",
@@ -66,6 +66,10 @@ def get_arg_parser():
     )
     parser.add_argument(
         "--edges", action="store_true", help="use edge detection photos"
+    )
+
+    parser.add_argument(
+        "--eval_train", action="store_true", help="validate on the training images. For debugging purposes"
     )
     parser.add_argument(
         "--equal_crop",
@@ -135,14 +139,13 @@ def main(args):
             print(key)
             dataroot = dataset_list[key]
             # create the training and valiation set
-            val_set = loading_data(
+            train_set, val_set = loading_data(
                 dataroot,
                 multiclass=args.multiclass,
                 equal_crop=args.equal_crop,
                 hsv=args.hsv,
                 hse=args.hse,
                 edges=args.edges,
-                class_filter=args.class_filter,
             )
             # create the sampler used during training
             sampler_val = torch.utils.data.SequentialSampler(val_set)
@@ -173,6 +176,40 @@ def main(args):
 
             print(result)
             print("")
+
+            if args.eval_train:
+                print("TRAIN")
+      
+                # create the sampler used during training
+                sampler_train = torch.utils.data.SequentialSampler(train_set)
+
+                result_path = None
+                if args.result_dir != None:
+                    result_path = os.path.join(args.result_dir, f"TRAIN_vis")
+                    if os.path.isdir(result_path):
+                        shutil.rmtree(result_path)
+                    os.mkdir(result_path)
+
+                data_loader_train = DataLoader(
+                    train_set,
+                    1,
+                    sampler=sampler_train,
+                    drop_last=False,
+                    collate_fn=utils.collate_fn_crowd,
+                    num_workers=args.num_workers,
+                )
+                result = evaluate_crowd_no_overlap(
+                    model,
+                    data_loader_train,
+                    device,
+                    vis_dir=result_path,
+                    multiclass=args.multiclass,
+                    num_classes=args.num_classes,
+                )
+
+                print(result)
+                print("")
+
 
     else:
         # create the training and valiation set
