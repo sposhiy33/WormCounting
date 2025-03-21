@@ -7,4 +7,4 @@ pretrained/
 nohup.out
 .nohup.out.swp
 eval_root/
-eval_viz/  
+eval_viz/

@@ -69,8 +69,8 @@ def loading_data(
 
 def loading_data_val(
     data_root,
-    num_patch,
-    patch_size,
+    num_patch=0,
+    patch_size=0,
     multiclass=False,
     equal_crop=False,
     hsv=False,
