@@ -180,12 +180,6 @@ def get_args_parser():
         type=str,
         help="name of the classes",
     )
-    parser.add_argument(
-        "--class_filter",
-        type=str,
-        default=None,
-        help="train on only the specified class index",
-    )
 
     parser.add_argument(
         "--hsv",
@@ -199,11 +193,20 @@ def get_args_parser():
         "--edges", action="store_true", help="use Canny edge output during training"
     )
     parser.add_argument(
-        "--sharpness", action="store_true", help="use sharpened image during training"
+        "--sharpness", action="store_true", help="use sharpness data augmnetation during training"
+    )
+    parser.add_argument(
+        "--scale", action="store_true", help="use scale data augmentation during training"
+    )
+    parser.add_argument(
+        "--equalize", action="store_true", help="use histogram equalization during training"
     )
 
     parser.add_argument(
         "--num_patches", type=int, default=4, help="number of patches to samples from each image"
+    )
+    parser.add_argument(
+        "--patch_size", type=int, default=512, help="size of the patches"
     )
 
     parser.add_argument("--seed", default=42, type=int)
@@ -345,23 +348,29 @@ def main(args):
     train_set, val_set = loading_data(
         args.data_root,
         multiclass=args.multiclass,
-        class_filter=args.class_filter,
         hsv=args.hsv,
         hse=args.hse,
         edges=args.edges,
+        scale=args.scale,
         sharpness=args.sharpness,
+        equalize=args.equalize,
         patch=True,
+        num_patch=args.num_patches,
+        patch_size=args.patch_size,
     )
 
     train_set_stats, val_set_stats = loading_data(
         args.data_root,
         multiclass=args.multiclass,
-        class_filter=args.class_filter,
         hsv=args.hsv,
         hse=args.hse,
         edges=args.edges,
+        scale=args.scale,
         sharpness=args.sharpness,
+        equalize=args.equalize,
         patch=False,
+        num_patch=args.num_patches,
+        patch_size=args.patch_size,
     )
 
     # create the sampler used during training

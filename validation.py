@@ -25,33 +25,33 @@ warnings.filterwarnings("ignore")
 def get_arg_parser():
     parser = argparse.ArgumentParser("Parameters for testing")
     parser.add_argument("--backbone", type=str, default="vgg16_bn")
+
+    # path parameters
     parser.add_argument("--weight_path", type=str)
+    parser.add_argument("--weight_type", type=str, choices=['best_mae.pth', 'best_training_loss.pth'])
     parser.add_argument("--result_dir", type=str)
     parser.add_argument("--val_set", type=str)
 
+    # model parameters
     parser.add_argument(
-        "--row", default=2, type=int, help="row number of anchor points"
+        "--row", default=1, type=int, help="row number of anchor points"
     )
     parser.add_argument(
-        "--line", default=2, type=int, help="line number of anchor points"
+        "--line", default=1, type=int, help="line number of anchor points"
     )
     parser.add_argument(
         "--num_classes", type=int, default=1, help="number of non no-person classes"
     )
     parser.add_argument("--dataroot", type=str)
-    parser.add_argument("--dataset_file", default="WORM")
+    parser.add_argument("--num_patch", type=int, default=4)
+    parser.add_argument("--patch_size", type=int, default=512) 
+    parser.add_argument("--dataset_file", default="WORM_VAL")
     
     parser.add_argument(
         "--multiclass",
         nargs="+",
         type=str,
         help="name of the classes",
-    )
-    parser.add_argument(
-        "--class_filter",
-        type=str,
-        default=None,
-        help="train on only the specified class index",
     )
 
     parser.add_argument(
@@ -67,7 +67,9 @@ def get_arg_parser():
     parser.add_argument(
         "--edges", action="store_true", help="use edge detection photos"
     )
-
+    parser.add_argument(
+        "--equalize", action="store_true", help="use histogram equalization"
+    )
     parser.add_argument(
         "--eval_train", action="store_true", help="validate on the training images. For debugging purposes"
     )
@@ -100,7 +102,12 @@ def get_arg_parser():
 def main(args):
 
     device = torch.device("cuda")
+
+    # argument parsing
     model = build_model(args)
+    args.num_classes = len(args.multiclass)
+    args.weight_path = os.path.join(args.result_dir,f"weights/{args.weight_type}")
+
 
     # load the trained network
     checkpoint = torch.load(args.weight_path, map_location="cpu")
@@ -113,6 +120,7 @@ def main(args):
     transform = standard_transforms.Compose(
         [
             standard_transforms.ToTensor(),
+            
             standard_transforms.Normalize(
                 mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
             ),
@@ -129,10 +137,14 @@ def main(args):
         # "MULTICLASS": "dataroot/resize_multiclass",
         #"L1": "dataroot/resize_L1",
         #"ADULT": "dataroot/worm_dataset",
-        "MIXED": "dataroot/lowres_all_images",
+        "LOWRES IMAGES": "dataroot/lowres_all_images",
+        # "HIGH_RES": "dataroot/all_images",
 
     }
-    
+
+
+    # if not specific evaluation set is specified, evaluated on 
+    # the sets given in 'datset_list'
     if args.val_set == None:
         for i, key in enumerate(list(dataset_list.keys())):
 
@@ -146,6 +158,9 @@ def main(args):
                 hsv=args.hsv,
                 hse=args.hse,
                 edges=args.edges,
+                equalize=args.equalize,
+                num_patch=args.num_patch,
+                patch_size=args.patch_size,
             )
             # create the sampler used during training
             sampler_val = torch.utils.data.SequentialSampler(val_set)
@@ -177,6 +192,8 @@ def main(args):
             print(result)
             print("")
 
+            # if specified, evalutate on the training images,
+            # this is mainly for sanity checks and checking for overfitting
             if args.eval_train:
                 print("TRAIN")
       
@@ -210,17 +227,19 @@ def main(args):
                 print(result)
                 print("")
 
-
+    # otherwise, just use dataset specified in args.val_set
     else:
         # create the training and valiation set
-        val_set = loading_data(
+        train_set, val_set = loading_data(
             args.val_set,
             multiclass=args.multiclass,
             equal_crop=args.equal_crop,
             hsv=args.hsv,
             hse=args.hse,
             edges=args.edges,
-            class_filter=args.class_filter,
+            equalize=args.equalize,
+            num_patch=args.num_patch,
+            patch_size=args.patch_size,
         )
         # create the sampler used during training
         sampler_val = torch.utils.data.SequentialSampler(val_set)
@@ -257,3 +276,5 @@ if __name__ == "__main__":
     parser = get_arg_parser()
     arg = parser.parse_args()
     main(arg)
+
+

@@ -6,3 +6,5 @@ pretrained/
 **/__pycache__/
 nohup.out
 .nohup.out.swp
+eval_root/
+eval_viz/  

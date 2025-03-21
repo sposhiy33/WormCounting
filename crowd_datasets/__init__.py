@@ -15,4 +15,9 @@ def build_dataset(args):
 
         return loading_data_val
 
+    elif args.dataset_file == "WORM_EVAL":
+        from crowd_datasets.WORM.loading_data import loading_data_eval
+        
+        return loading_data_eval
+
     return None

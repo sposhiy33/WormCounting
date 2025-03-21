@@ -17,6 +17,8 @@ class WORM(Dataset):
     def __init__(
         self,
         data_root,
+        num_patch,
+        patch_size,
         transform=None,
         train=False,
         scale=False,
@@ -25,10 +27,11 @@ class WORM(Dataset):
         equal_crop=False,
         flip=False,
         multiclass=False,
-        class_filter=None,
         hsv=False,
         hse=False,
         edges=False,
+        sharpness=False,
+        equalize=False,
     ):
         self.root_path = data_root
 
@@ -69,6 +72,8 @@ class WORM(Dataset):
         # number of samples
         self.nSamples = len(self.img_list)
 
+        self.num_patch = num_patch 
+        self.patch_size = patch_size
         self.transform = transform
         self.rotate = rotate
         self.train = train
@@ -77,10 +82,12 @@ class WORM(Dataset):
         self.flip = flip
         self.multiclass = multiclass
         self.equal_crop = equal_crop
-        self.class_filter = class_filter
         self.hsv = hsv
         self.hse = hse
         self.edges = edges
+        self.sharpness = sharpness
+        self.equalize = equalize
+        
 
     def __len__(self):
         return self.nSamples
@@ -92,22 +99,30 @@ class WORM(Dataset):
         gt_path = self.img_map[img_path]
         # load image and ground truth
         img, point, labels = load_data(
-            (img_path, gt_path), self.train, self.multiclass, self.class_filter
+            (img_path, gt_path), self.train, self.multiclass,
         )
 
         if self.edges:
-            img = edges(img)
+            img = edges(img)  
 
-        # apply augumentation
+        if self.equalize:
+            img = F.equalize(img)
+
+        if self.sharpness:
+            # apply sharpness augmentation
+            sharp_range = [0,2]
+            sharpness = random.uniform(*sharp_range)
+            img = F.adjust_sharpness(img, sharpness)
+
+        # apply transformation -> tensor, normalization
         if self.transform is not None:
             img = self.transform(img)
 
         if self.train and self.scale:
             # data augmentation -> random scale
-            scale_range = [0.7, 1.3]
+            scale_range = [0.5, 1.5]
             min_size = min(img.shape[1:])
             scale = random.uniform(*scale_range)
-            print(scale)
             # scale the image and points
             if scale * min_size > 128:
                 img = torch.nn.functional.upsample_bilinear(
@@ -117,7 +132,7 @@ class WORM(Dataset):
 
         # crop augumentaiton
         if self.train and self.patch:
-            img, point, labels = random_crop(img, point, labels)
+            img, point, labels = random_crop(img, point, labels, num_patch=self.num_patch, patch_size=self.patch_size)
 
             # convert point arrays for each image to torch Tensor type
             for i, _ in enumerate(point):
@@ -162,8 +177,86 @@ class WORM(Dataset):
 
         return img, target
 
+# class for simple eval, no point annotations 
+class WORM_eval(Dataset):
+    def __init__(
+        self,
+        data_root,
+        transform=None,
+        scale=False,
+        rotate=False,
+        patch=False,
+        equal_crop=False,
+        flip=False,
+        hsv=False,
+        hse=False,
+        edges=False,
+    ):
+        self.root_path = data_root
 
-def load_data(img_gt_path, train, multiclass, class_filter):
+        # make list of image paths
+        self.img_list = os.listdir(self.root_path)
+        # number of samples
+        self.nSamples = len(self.img_list)
+
+        self.transform = transform
+        self.rotate = rotate
+        self.patch = patch
+        self.scale = scale
+        self.flip = flip
+        self.equal_crop = equal_crop
+        self.hsv = hsv
+        self.hse = hse
+        self.edges = edges
+
+    def __len__(self):
+        return self.nSamples
+    
+    def __getitem__(self, index):
+        assert index <= len(self), "index range error"
+        img_path = self.img_list[index]
+        img_path = os.path.join(self.root_path, img_path)
+        img = load_img(img_path)
+
+        if self.edges:
+            img = edges(img)
+
+        # apply augumentation
+        if self.transform is not None:
+            img = self.transform(img)
+
+        if self.scale:
+            # data augmentation -> random scale
+            scale_range = [0.7, 1.3]
+            min_size = min(img.shape[1:])
+            scale = random.uniform(*scale_range)
+            # scale the image and points
+            if scale * min_size > 128:
+                img = torch.nn.functional.upsample_bilinear(
+                    img.unsqueeze(0), scale_factor=scale
+                ).squeeze(0)
+                point *= scale
+
+
+        if self.hsv:
+            img = rgb_to_hsv(img)
+
+        if self.hse:
+            try: img = img.detach().numpy()
+            except: print("img is already a numpy array")
+            img = rgb_to_hse(img)
+
+        img = torch.Tensor(img)
+        
+        return img
+
+  
+def load_img(img_path):
+    img = cv2.imread(img_path)
+    img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+    return img
+
+def load_data(img_gt_path, train, multiclass):
     img_path, gt_path = img_gt_path
     # load the images
     img = cv2.imread(img_path)
@@ -211,6 +304,7 @@ def load_data(img_gt_path, train, multiclass, class_filter):
         del points[ind]
 
     return img, np.array(points), np.array(labels)
+
 
 
 def rgb_to_hsv(rgb):
@@ -477,12 +571,12 @@ def equal_crop(img, den, labels, num_patches: int = 4):
     return result_img, result_den, result_lab
 
 
-# random crop augumentation
-def random_crop(img, den, labels, edge_image = None, num_patch: int = 4):
+# random crop augumentation for training data
+def random_crop(img, den, labels, edge_image = None, num_patch: int = 4, patch_size: int = 512):
 
-    # try to use 256 * 256 resolution
-    half_h = 512
-    half_w = 512
+    # patch resolution
+    half_h = patch_size
+    half_w = patch_size
     # half_h = img.size()[1]//4
     # half_w = img.size()[2]//4
     if edge_image == None:
@@ -526,3 +620,4 @@ def random_crop(img, den, labels, edge_image = None, num_patch: int = 4):
             current_count += 1
 
     return result_img, result_den, result_lab
+

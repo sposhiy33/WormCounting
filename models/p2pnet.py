@@ -71,7 +71,7 @@ class ClassificationModel(nn.Module):
         self.conv2 = nn.Conv2d(feature_size, feature_size, kernel_size=3, padding=1)
         self.act2 = nn.ReLU()
 
-        self.conv3 = nn.Conv2d(num_features_in, feature_size, kernel_size=3, padding=1)
+        self.conv3 = nn.Conv2d(feature_size, feature_size, kernel_size=3, padding=1)
         self.act1 = nn.ReLU()
 
         self.conv4 = nn.Conv2d(feature_size, feature_size, kernel_size=3, padding=1)
@@ -244,7 +244,7 @@ class P2PNet(nn.Module):
 
         self.anchor_points = AnchorPoints(
             pyramid_levels=[
-                2,
+                3,
             ],
             row=row,
             line=line,
@@ -259,8 +259,8 @@ class P2PNet(nn.Module):
         features_fpn = self.fpn([features[1], features[2], features[3]])
         batch_size = features[0].shape[0]
         # run the regression and classification branch
-        regression = self.regression(features_fpn[0]) * 100  # 8x
-        classification = self.classification(features_fpn[0])
+        regression = self.regression(features_fpn[1]) * 100  # 8x
+        classification = self.classification(features_fpn[1])
         anchor_points = self.anchor_points(samples).repeat(batch_size, 1, 1)
         # decode the points as prediction
         if self.noreg==True: 
