@@ -90,6 +90,10 @@ def get_arg_parser():
         help="option to intialize network with only the classifiation branch"
     )
 
+    parser.add_argument(
+        "--gpu_id", default=1, type=int, help="the gpu used for training"
+    )
+
 
 
     ## throwaway args
@@ -101,7 +105,7 @@ def get_arg_parser():
 
 def main(args):
 
-    device = torch.device("cuda")
+    device = 'cuda'
 
     # argument parsing
     model = build_model(args)
@@ -136,7 +140,6 @@ def main(args):
     dataset_list = {
         # "MULTICLASS": "dataroot/resize_multiclass",
         #"L1": "dataroot/resize_L1",
-        #"ADULT": "dataroot/worm_dataset",
         "LOWRES IMAGES": "dataroot/lowres_all_images",
         # "HIGH_RES": "dataroot/all_images",
 
