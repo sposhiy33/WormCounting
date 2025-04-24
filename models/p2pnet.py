@@ -103,6 +103,22 @@ class ClassificationModel(nn.Module):
         return out2.contiguous().view(x.shape[0], -1, self.num_classes)
 
 
+class Linear(nn.Module):
+    def __init__(self, in_feat, out_feat):
+        super(Linear, self).__init__()
+
+        self.lin = nn.Sequential(
+            nn.Linear(in_feat, 512),
+            nn.ReLU(),
+            nn.Linear(512, 512),
+            nn.ReLU(),
+            nn.Linear(512, out_feat),
+        )
+
+    def forward(self, x):
+        out = self.lin(x)
+        return out
+
 # generate the reference points in grid layout
 def generate_anchor_points(stride=16, row=3, line=3):
     row_step = stride / row
