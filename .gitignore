@@ -9,3 +9,5 @@ nohup.out
 eval_root/
 eval_viz/
 optuna_gnn.py
+dataroot
+results
