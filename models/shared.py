@@ -1,3 +1,12 @@
+'''
+IMCOMPLETE
+
+Slight modification to the P2PNet architecture in order to further
+proces the shared feature space, rather than training two seperate representations 
+for the two seperate braches, regression and classification
+'''
+
+
 import time
 
 import numpy as np
@@ -138,7 +147,7 @@ class Conv(nn.Module):
                  num_classes=80,
                  prior=0.01,
                  feature_size=256):
-
+        pass
 
 class CombNet(nn.module):
     def __init__(self, backbone, num_classes, row=2, line=2):

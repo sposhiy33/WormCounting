@@ -42,6 +42,7 @@ class ClassificationModel(nn.Module):
 
     # sub-branch forward
     def forward(self, x):
+        
         out = self.conv1(x)
         out = self.act1(out)
 
@@ -50,13 +51,16 @@ class ClassificationModel(nn.Module):
 
         out = self.output(out)
 
+
         out1 = out.permute(0, 2, 3, 1)
 
         batch_size, width, height, _ = out1.shape
 
+        # reshape hte output in a softmax-able format
         out2 = out1.view(
             batch_size, width, height, self.num_anchor_points, self.num_classes
         )
+
 
         return out2.contiguous().view(x.shape[0], -1, self.num_classes)
 
@@ -219,7 +223,7 @@ class Classifier(nn.Module):
         classification = self.classification(features_fpn[1])
         output_class = classification
         anchor_points = self.anchor_points(samples).repeat(batch_size, 1, 1)
-        
+
         output_coord = anchor_points
         output_class = classification
         out = {"pred_logits": output_class, "pred_points": output_coord}

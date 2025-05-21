@@ -80,15 +80,16 @@ class HungarianMatcher_Crowd(nn.Module):
         # Compute the L2 cost between point
         cost_point = torch.cdist(out_points, tgt_points, p=2)
 
-        # Compute the giou cost between point
-
+        # Compute the GIoU cost between point
         # Final cost matrix
         if self.pointmatch:
             C = cost_point
         else:
             C = self.cost_point * cost_point + self.cost_class * cost_class
+        
+        # Reshape to back to [batch_size, num_queries, num_target_points]
         C = C.view(bs, num_queries, -1).cpu()
-
+        # compute the matching
         sizes = [len(v["point"]) for v in targets]
         indices = [
             linear_sum_assignment(c[i]) for i, c in enumerate(C.split(sizes, -1))

@@ -18,6 +18,7 @@ from torch.utils.data import DataLoader, DistributedSampler
 from crowd_datasets import build_dataset
 from engine import *
 from models import build_model
+from models.matcher import build_matcher_crowd
 
 warnings.filterwarnings("ignore")
 
@@ -91,6 +92,12 @@ def get_arg_parser():
     )
 
     parser.add_argument(
+        "--mlp",
+        action='store_true',
+        help="option to build a model with a MLP at the end"
+    )
+
+    parser.add_argument(
         "--gpu_id", default=1, type=int, help="the gpu used for training"
     )
 
@@ -99,6 +106,14 @@ def get_arg_parser():
     ## throwaway args
     parser.add_argument("--batch_size", default=8, type=int)
     parser.add_argument("--num_workers", default=8, type=int)
+    parser.add_argument("--set_cost_class", default=1, type=float) 
+    parser.add_argument("--set_cost_point", default=1, type=float)
+    parser.add_argument(
+        "--pointmatch",
+        action="store_true",
+        help="only use point distance as the hungarian alg metric")
+
+
 
     return parser
 
@@ -109,6 +124,7 @@ def main(args):
 
     # argument parsing
     model = build_model(args)
+    matcher = build_matcher_crowd(args)
     args.num_classes = len(args.multiclass)
     args.weight_path = os.path.join(args.result_dir,f"weights/{args.weight_type}")
 
@@ -194,6 +210,7 @@ def main(args):
 
             print(result)
             print("")
+
 
             # if specified, evalutate on the training images,
             # this is mainly for sanity checks and checking for overfitting

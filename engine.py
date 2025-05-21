@@ -289,14 +289,16 @@ def evaluate_crowd_no_overlap(
     # run inference on all images to calc MAE
     maes = []
     mses = []
-
+    
     count = []
     gt_count = []
-
 
     class_mae = []
     class_mse = []
     class_dist = []
+
+    # iterate over each of the classes
+    # class wise metrics
     for i in range(num_classes):
         i_mae = []
         i_mse = []
@@ -329,8 +331,11 @@ def evaluate_crowd_no_overlap(
                 predict_cnt = 0
 
                 class_idx = i + 1
+
                 outputs_scores = torch.nn.functional.softmax(
                     outputs["pred_logits"], -1)[:, :, class_idx][0]
+                
+                # final output points 
                 prop_points = (
                     outputs_points[outputs_scores > threshold]
                     .detach()
@@ -338,7 +343,8 @@ def evaluate_crowd_no_overlap(
                     .numpy()
                     .tolist()
                 )
-                
+
+                # calculate distance between each predicted point and the closest ground truth point 
                 if (len(ground_truth_points) > 0) and (len(prop_points) > 0):
                     dist = torch.cdist(torch.Tensor(ground_truth_points),
                                    torch.Tensor(prop_points),
@@ -370,6 +376,7 @@ def evaluate_crowd_no_overlap(
     print(f"MSE: {class_mse}")
     print(f"DIST: {class_dist}")
 
+    # general eval pass, not class wise 
     for batch, batch_targets in data_loader:
         for samples, targets in zip(batch, batch_targets): 
             samples = samples.to(device)
@@ -385,6 +392,7 @@ def evaluate_crowd_no_overlap(
             outputs_points = outputs["pred_points"][0]
             target_labels = targets["labels"].detach().numpy().tolist()
             gt_cnt = targets["point"].shape[0]
+           
             # 0.5 is used by default
             threshold = 0.5
 
@@ -439,6 +447,8 @@ def evaluate_crowd_no_overlap(
             mse = (predict_cnt - gt_cnt) * (predict_cnt - gt_cnt)
             maes.append(float(mae))
             mses.append(float(mse))
+
+
     # calc MAE, MSE
     mae = np.mean(maes)
     mse = np.sqrt(np.mean(mses))
@@ -452,6 +462,85 @@ def evaluate_crowd_no_overlap(
     for i in range(gt_count.shape[1]):
         final_gt_count.append(np.sum(gt_count[:, i]))
         final_count.append(np.sum(count[:, i]))
-    # calculate total
+    # print counts
     print(f"gt_count: {final_gt_count}    count: {final_count}")
     return mae, mse
+
+'''
+def confusion(model, data_loader, matcher, multiclass=None, num_classes=None, device=None):
+    
+    model.eval()
+    
+    for batch, batch_targets in data_loader:
+        for samples, targets in zip(batch, batch_targets): 
+            
+            samples = samples.to(device)
+            samples = samples.unsqueeze(0)
+            outputs = model(samples)
+            # logits and class_labels of point proposals, to be populated
+            points = []
+            class_labels = []
+
+            outputs_points = outputs["pred_points"][0]
+            target_labels = targets["labels"].detach().numpy().tolist()
+            gt_cnt = targets["point"].shape[0]
+
+            # matcher
+            indices = matcher(outputs, targets, pointmatch=True)
+
+            # get the final output points
+            # 0.5 is used by default
+            threshold = 0.5
+
+            # get the predicted points
+            pred_logits = outputs["pred_logits"][0]    
+            output_scores = torch.nn.functional.softmax(outputs["pred_logits"], -1)[:, :, 1][0]
+            points = (
+                    outputs_points[output_scores > threshold]
+                    .detach()
+                    .cpu()
+                    .numpy()
+                    .tolist()
+                )
+
+            # create empty list for confusion labels
+            confusion_matrix = torch.full(
+                (1, output_scores[0].size())
+                0, 
+            )
+
+            #  use indicies to get the correct 
+
+            # assign to each proposal point:
+            # 0 - TN , 1- TP ,  2 - FN , 3 - FP 
+            for batch in range(confusion_matrix.size(0)):
+                for i in range(confusion_matrix.size(1)):
+                    # if the target class  is 0 (TN) and the src class is 0 (TN) 
+                    ground = target_classes[batch, i]
+                    src_pred = torch.argmax(pred_logits[batch, i]).item()
+
+                    if (ground == 1) and (src_pred == 1):
+                        confusion_matrix[batch, i] = 1
+                    elif (ground == 1) and (src_pred == 0):
+                        confusion_matrix[batch, i] = 2
+                    elif (ground == 0) and (src_pred == 1):
+                        confusion_matrix[batch, i] = 3
+            
+    
+
+
+                        
+            outputs_scores = torch.nn.functional.softmax(outputs["pred_logits"], -1)[:, :, 1][0]
+            points = (
+                outputs_points[outputs_scores > threshold]
+                .detach()
+                .cpu()
+                .numpy()
+                .tolist()
+            )
+            cnt = len(points)
+            predict_cnt += cnt
+            gt_count.append([len(target_labels)])
+            count.append([cnt])
+'''
+ 

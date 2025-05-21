@@ -1,5 +1,5 @@
 """
-Perform evaluation of given images using a pre-trained model.
+Pure evaluation script for unlabelled images
 """
 
 import argparse

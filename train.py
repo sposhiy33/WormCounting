@@ -209,6 +209,10 @@ def get_args_parser():
         "--patch_size", type=int, default=512, help="size of the patches"
     )
 
+    parser.add_argument("--gnn_layers", default=3, type=int, help="number of GNN layers")
+
+    parser.add_argument("--knn", default=4, type=int, help="number of nearest neighbors for KNN graph construction")
+
     parser.add_argument("--seed", default=42, type=int)
     parser.add_argument(
         "--resume", type=str, default=None, help="resume from checkpoint"
@@ -234,6 +238,24 @@ def get_args_parser():
         "--classifier",
         action="store_true",
         help="option to intialize network with only the classifiation branch"
+    )
+
+    parser.add_argument(
+        "--mlp",
+        action='store_true',
+        help="option to build a model with a MLP at the end"
+    )
+
+    parser.add_argument(
+        "--confusion",
+        action='store_true',
+        help="option to build model that optimizes confusion matrix"
+    )
+
+    parser.add_argument(
+        "--gat",
+        action='store_true',
+        help="option to build model that uses GAT for classification"
     )
 
     parser.add_argument("--eval", action="store_true")

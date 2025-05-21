@@ -1,3 +1,7 @@
+'''
+Vanilla P2PNet implementation
+'''
+
 import time
 
 import matplotlib.pyplot as plt
@@ -101,23 +105,6 @@ class ClassificationModel(nn.Module):
         )
 
         return out2.contiguous().view(x.shape[0], -1, self.num_classes)
-
-
-class Linear(nn.Module):
-    def __init__(self, in_feat, out_feat):
-        super(Linear, self).__init__()
-
-        self.lin = nn.Sequential(
-            nn.Linear(in_feat, 512),
-            nn.ReLU(),
-            nn.Linear(512, 512),
-            nn.ReLU(),
-            nn.Linear(512, out_feat),
-        )
-
-    def forward(self, x):
-        out = self.lin(x)
-        return out
 
 # generate the reference points in grid layout
 def generate_anchor_points(stride=16, row=3, line=3):
@@ -316,6 +303,7 @@ class SetCriterion_Crowd(nn.Module):
             matcher: module able to compute a matching between targets and proposals
             weight_dict: dict containing as key the names of the losses and as values their relative weight.
             eos_coef: relative classification weight applied to the no-object category
+            ce_coef: list of weight os each class in cross entropy loss (focal loss formulation)
             losses: list of all the losses to be applied. See get_loss for list of available losses.
         """
         super().__init__()
@@ -349,7 +337,6 @@ class SetCriterion_Crowd(nn.Module):
         """
         assert "pred_logits" in outputs
         src_logits = outputs["pred_logits"]
-
         idx = self._get_src_permutation_idx(indices)
         target_classes_o = torch.cat(
             [t["labels"][J] for t, (_, J) in zip(targets, indices)]
@@ -359,7 +346,6 @@ class SetCriterion_Crowd(nn.Module):
         )
 
         target_classes[idx] = target_classes_o
-
         ## classwise loss for debugging
         classwise_loss_ce = []
         for i in range(self.num_classes + 1):
@@ -368,13 +354,13 @@ class SetCriterion_Crowd(nn.Module):
             lce = F.cross_entropy(src_logits.transpose(1, 2), target_classes, weight)
             classwise_loss_ce.append(lce)
 
+        # calculate loss    
         loss_ce = F.cross_entropy(
             src_logits.transpose(1, 2), target_classes, self.ce_weight
         )
 
         losses = {"loss_ce": loss_ce}
         class_losses = {"class_loss_ce": classwise_loss_ce}
-
         return losses, class_losses
 
     def loss_points(self, outputs, targets, indices, num_points, samples):
@@ -386,7 +372,7 @@ class SetCriterion_Crowd(nn.Module):
             [t["point"][i] for t, (_, i) in zip(targets, indices)], dim=0
         )
 
-        # point labels
+        # point label
         target_classes = torch.cat(
             [t["labels"][J] for t, (_, J) in zip(targets, indices)]
         )
@@ -605,22 +591,21 @@ class SetCriterion_Crowd(nn.Module):
 
     def forward(self, outputs, targets, samples):
         """This performs the loss computation.
-        print(pred_logits.size())
         Parameters:
              outputs: dict of tensors, see the output specification of the model for the format
-             targets: list of dicts, such that len(targets) == batch_size.
+             targets: list of dicts, such that len(targets) = batch_size.
                       The expected keys in each dict depends on the losses applied, see each loss' doc
         """
-        output1 = {
+        output = {
             "pred_logits": outputs["pred_logits"],
             "pred_points": outputs["pred_points"],
         }
 
-        indices1 = self.matcher(output1, targets)
+        indices = self.matcher(output, targets)
 
         num_points = sum(len(t["labels"]) for t in targets)
         num_points = torch.as_tensor(
-            [num_points], dtype=torch.float, device=next(iter(output1.values())).device
+            [num_points], dtype=torch.float, device=next(iter(output.values())).device
         )
         if is_dist_avail_and_initialized():
             torch.distributed.all_reduce(num_points)
@@ -630,7 +615,7 @@ class SetCriterion_Crowd(nn.Module):
         classwise_losses = {}
         for loss in self.losses:
             main, classwise = self.get_loss(
-                loss, output1, targets, indices1, num_boxes, samples
+                loss, output, targets, indices, num_boxes, samples
             )
             losses.update(main)
             classwise_losses.update(classwise)

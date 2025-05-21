@@ -8,3 +8,4 @@ nohup.out
 .nohup.out.swp
 eval_root/
 eval_viz/
+optuna_gnn.py
