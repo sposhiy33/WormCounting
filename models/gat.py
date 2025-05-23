@@ -94,7 +94,7 @@ class GATClassifier(nn.Module):
         # create the batch index for the KNN graph (seperate graph for each sample in batch)
         batch_index = torch.arange(batch_size).repeat_interleave(anchor_points.shape[1]) 
         # create the KNN graph 
-        edge_index = knn_graph(flat_coords, k=self.k, batch=batch_index, loop=False)
+        edge_index = knn_graph(flat_coords, k=self.k, batch=batch_index, loop=True)
         data = Batch(x=flat_features, edge_index=edge_index, batch=batch_index)
 
         # pass through the GAT classifier

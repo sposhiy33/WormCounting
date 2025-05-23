@@ -9,6 +9,8 @@ import sys
 import time
 from typing import Iterable
 
+from scipy.optimize import linear_sum_assignment
+
 import cv2
 import numpy as np
 import torch
@@ -36,6 +38,9 @@ def vis(samples, pred, vis_dir, eval=False, targets=None, class_labels=None, img
     pred -> list: [num_preds, 2]
     class_labels -> list: [num_preds] -- predicited class of each predicted point
     """
+    if samples.ndim < 4:
+        samples = samples.unsqueeze(0)
+
     try: gts = [targets["point"].tolist()]
     except: print("targets not specified, performing pure eval") 
 
@@ -227,320 +232,150 @@ def train_one_epoch(
     }, classwise_loss_total_epoch
 
 
+"""
+evaluation helper functions
+
+TODO: allow for multiclass evaluation
+"""
 
 @torch.no_grad()
-def evaluate_crowd(model, data_loader, device, vis_dir=None):
+def get_output_points(model, sample, target, device, class_ind=1, threshold=0.5):
+
+    sample = sample.to(device)
+    sample = sample.unsqueeze(0)
+    outputs = model(sample)
+
+    # to populate
+    points = []
+    class_labels = []
+
+    outputs_points = outputs["pred_points"][0]
+
+    outputs_scores = torch.nn.functional.softmax(outputs["pred_logits"], -1)[:, :, class_ind][0]
+    points = (
+        outputs_points[outputs_scores > threshold]
+        .detach()
+        .cpu()
+        .numpy()
+        .tolist()
+    )
+
+    return points
+ 
+# mse and mae - count metrics
+def metric_mae_mse(model, dataloader, device, vis_dir=None):
+
+    error = []
+    sq_error = []
+
+    pred_cnts = []
+    gt_cnts = []
+
+    for batch, batch_targets in dataloader:
+        for samples, targets in zip(batch, batch_targets):
+            
+            points = get_output_points(model, samples, targets, device)
+
+            # get the predicted count and the ground truth count
+            pred_cnt = len(points)
+            gt_cnt = targets["point"].shape[0]
+            
+            pred_cnts.append(pred_cnt)
+            gt_cnts.append(gt_cnt)
+
+            # calculate the mean absolute error and mean square error
+            mae = abs(pred_cnt - gt_cnt)
+            mse = (pred_cnt - gt_cnt) * (pred_cnt - gt_cnt)
+
+            error.append(float(mae))
+            sq_error.append(float(mse))
+
+            # if specified, save the visualized images
+            if vis_dir is not None:
+                vis(samples, [points], vis_dir, targets=targets)
+
+    print(f'COUNTS (GT, PRED): {[[g,p] for g,p in zip(gt_cnts, pred_cnts)]}')
+    print(f'Error: {error}')
+    print(f'Square Error: {sq_error}')
+
+    # calculate MAE, MSE
+    mae = np.mean(error)
+    mse = np.sqrt(np.mean(sq_error))
+
+    return mae, mse
+
+# # get the true positive points
+def get_tp(points, targets, threshold:float):
+
+    if len(points) == 0:
+        return 0,0,0
+
+    points = torch.tensor(points)
+    targets = targets["point"]
+
+    num_preds = len(points)
+    num_gt = targets.shape[0]
+
+    # calculate the distance between the points
+    dist_matrix = torch.cdist(points, targets, p=2)
+    # cost matrix
+    C = dist_matrix.detach().cpu()
+
+    pred_indices, gt_indices = linear_sum_assignment(C)
     
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    tp_count = 0
+    # Iterate through the optimal assignments
+    for pred_idx, gt_idx in zip(pred_indices, gt_indices):
+        # If the distance for this assignment is within the threshold, it's a TP
+        if dist_matrix[pred_idx, gt_idx] < threshold:
+            tp_count += 1
+            
+    fp_count = num_preds - tp_count
+    fn_count = num_gt - tp_count if (num_gt - tp_count) > 0 else 0 
     
-    model.eval()
-    model.to(device)
+    return tp_count, fp_count, fn_count
     
-    for idx, batch in enumerate(data_loader):
-        img = batch[0]
-        img = img.to(device)
-        outputs = model(img)
-        # print(f"Pred Points: {outputs["pred_points"].size()}")
-        # print(f"Pred Logits: {outputs["pred_logits"].size()}")
-        # logits and class_labels of point proposals, to be populated
-        points = []
-        class_labels = []
+# precision, recall, f1 score - localization performance
+def metric_precision_recall_f1(model, dataloader, threshold, device):
 
-        outputs_points = outputs["pred_points"][0]
-       
-        # 0.5 is used by default
-        threshold = 0.5
+    total_tp = 0
+    total_fp = 0
+    total_fn = 0
 
-        class_idx = 0 + 1
-        outputs_scores = torch.nn.functional.softmax(
-            outputs["pred_logits"], -1)[:, :, class_idx][0]
-        prop_points = (
-            outputs_points[outputs_scores > threshold]
-            .detach()
-            .cpu()
-            .numpy()
-            .tolist()
-        )
+    for batch, batch_targets in dataloader: 
+        for samples, targets in zip(batch, batch_targets):
+            points = get_output_points(model, samples, targets, device)
 
-        for p in prop_points:
-            points.append(p)
-            class_labels.append(class_idx)
-        predict_cnt = int((outputs_scores > threshold).sum())
+            pred_cnt = len(points)
+            gt_cnt = targets["point"].shape[0]
 
-        print(predict_cnt)
+            # calculate precision, recall, f1 score
+            tp, fp, fn = get_tp(points, targets, threshold=threshold)
 
-        if vis_dir != None:
-            vis(img, [points], vis_dir, eval=True, class_labels=class_labels, img_name=idx) 
-                
-        
+            total_tp += tp
+            total_fp += fp
+            total_fn += fn
+            
+    prec = total_tp / (total_tp + total_fp) if (total_tp + total_fp) > 0 else 0
+    rec = total_tp / (total_tp + total_fn) if (total_tp + total_fn) > 0 else 0
+    f1 = 2 * (prec * rec) / (prec + rec) if (prec + rec) > 0 else 0
+
+    return prec, rec, f1 
 
 # the inference routine for p2p net
 # validation, error with ground truth points
 @torch.no_grad()
 def evaluate_crowd_no_overlap(
-    model, data_loader, device, vis_dir=None, multiclass=None, num_classes=None
-):
+    model, data_loader, device, vis_dir=None, multiclass=None, num_classes=None):
     model.eval()
-
-    metric_logger = utils.MetricLogger(delimiter="  ")
-    metric_logger.add_meter(
-        "class_error", utils.SmoothedValue(window_size=1, fmt="{value:.2f}")
-    )
-    # run inference on all images to calc MAE
-    maes = []
-    mses = []
-    
-    count = []
-    gt_count = []
-
-    class_mae = []
-    class_mse = []
-    class_dist = []
-
-    # iterate over each of the classes
-    # class wise metrics
-    for i in range(num_classes):
-        i_mae = []
-        i_mse = []
-        dist_list = []
-        for batch, batch_targets in data_loader:
-            for samples, targets in zip(batch, batch_targets):
-                samples = samples.to(device)
-                samples = samples.unsqueeze(0)
-                # print(f"Samples: {samples.size()}")
-                outputs = model(samples)
-                # print(f"Pred Points: {outputs["pred_points"].size()}")
-                # print(f"Pred Logits: {outputs["pred_logits"].size()}")
-                # logits and class_labels of point proposals, to be populated
-                points = []
-                class_labels = []
-
-                outputs_points = outputs["pred_points"][0]
-                target_labels = targets["labels"].detach().numpy().tolist()
-                target_point = targets["point"].detach().numpy().tolist()
-               
-                ground_truth_points = []
-                # truth map --
-                for index, class_type in enumerate(target_labels):
-                    if class_type == i + 1:
-                        ground_truth_points.append(target_point[index])
-
-
-                # 0.5 is used by default
-                threshold = 0.5
-                predict_cnt = 0
-
-                class_idx = i + 1
-
-                outputs_scores = torch.nn.functional.softmax(
-                    outputs["pred_logits"], -1)[:, :, class_idx][0]
-                
-                # final output points 
-                prop_points = (
-                    outputs_points[outputs_scores > threshold]
-                    .detach()
-                    .cpu()
-                    .numpy()
-                    .tolist()
-                )
-
-                # calculate distance between each predicted point and the closest ground truth point 
-                if (len(ground_truth_points) > 0) and (len(prop_points) > 0):
-                    dist = torch.cdist(torch.Tensor(ground_truth_points),
-                                   torch.Tensor(prop_points),
-                                   p=2)
-                    min_dist = torch.min(dist, 1)
-                    mean_dist = torch.mean(min_dist[0])
-                    dist_list.append(mean_dist.item())
-                for p in prop_points:
-                    points.append(p)
-                    class_labels.append(class_idx)
-                predict_cnt = int((outputs_scores > threshold).sum())
-                gt_cnt = len([i for i in target_labels if i == class_idx])
-
-                mae = abs(predict_cnt - gt_cnt)
-                mse = (predict_cnt - gt_cnt) * (predict_cnt - gt_cnt)
-                i_mae.append(mae)
-                i_mse.append(mse)
-        i_mae = sum(i_mae) / len(i_mae)
-        i_mse = sum(i_mse) / len(i_mse)
-        i_mse = math.sqrt(i_mse)
-        if len(dist_list) > 0:
-            dist_list = sum(dist_list) / len(dist_list)
-        else: dist_list = math.inf 
-        class_mae.append(i_mae)
-        class_mse.append(i_mse)
-        class_dist.append(dist_list)
-
-    print(f"MAE: {class_mae}")
-    print(f"MSE: {class_mse}")
-    print(f"DIST: {class_dist}")
-
-    # general eval pass, not class wise 
-    for batch, batch_targets in data_loader:
-        for samples, targets in zip(batch, batch_targets): 
-            samples = samples.to(device)
-            samples = samples.unsqueeze(0)
-            # print(f"Samples: {samples.size()}")
-            outputs = model(samples)
-            # print(f"Pred Points: {outputs["pred_points"].size()}")
-            # print(f"Pred Logits: {outputs["pred_logits"].size()}")
-            # logits and class_labels of point proposals, to be populated
-            points = []
-            class_labels = []
-
-            outputs_points = outputs["pred_points"][0]
-            target_labels = targets["labels"].detach().numpy().tolist()
-            gt_cnt = targets["point"].shape[0]
-           
-            # 0.5 is used by default
-            threshold = 0.5
-
-            predict_cnt = 0
-
-            if len(multiclass)>0:
-                # iterate over each of the classes
-                target_count = []
-                proposal_count = []
-                for i in range(num_classes):
-                    class_idx = i + 1
-                    outputs_scores = torch.nn.functional.softmax(
-                        outputs["pred_logits"], -1)[:, :, class_idx][0]
-                    prop_points = (
-                        outputs_points[outputs_scores > threshold]
-                        .detach()
-                        .cpu()
-                        .numpy()
-                        .tolist()
-                    )
-                    for p in prop_points:
-                        points.append(p)
-                        class_labels.append(class_idx)
-                    cnt = int((outputs_scores > threshold).sum())
-                    predict_cnt += cnt
-                    proposal_count.append(cnt)
-                    target_count.append(len([i for i in target_labels if i == class_idx]))
-                count.append(proposal_count)
-                gt_count.append(target_count)
-            else:
-                outputs_scores = torch.nn.functional.softmax(outputs["pred_logits"], -1)[:, :, 1][0]
-                points = (
-                    outputs_points[outputs_scores > threshold]
-                    .detach()
-                    .cpu()
-                    .numpy()
-                    .tolist()
-                )
-                cnt = len(points)
-                predict_cnt += cnt
-                gt_count.append([len(target_labels)])
-                count.append([cnt])
-
-            # if specified, save the visualized images
-            if vis_dir is not None:
-                if multiclass:
-                    vis(samples, [points], vis_dir, class_labels=class_labels, targets=targets)
-                else:
-                    vis(samples, [points], vis_dir, targets=targets)
-            # accumulate MAE, MSE
-            mae = abs(predict_cnt - gt_cnt)
-            mse = (predict_cnt - gt_cnt) * (predict_cnt - gt_cnt)
-            maes.append(float(mae))
-            mses.append(float(mse))
-
-
-    # calc MAE, MSE
-    mae = np.mean(maes)
-    mse = np.sqrt(np.mean(mses))
-
-    gt_count = np.array(gt_count)
-    count = np.array(count)
-    final_gt_count = []
-    final_count = []
-    print(gt_count)
-    print(count)
-    for i in range(gt_count.shape[1]):
-        final_gt_count.append(np.sum(gt_count[:, i]))
-        final_count.append(np.sum(count[:, i]))
-    # print counts
-    print(f"gt_count: {final_gt_count}    count: {final_count}")
-    return mae, mse
-
-'''
-def confusion(model, data_loader, matcher, multiclass=None, num_classes=None, device=None):
-    
-    model.eval()
-    
-    for batch, batch_targets in data_loader:
-        for samples, targets in zip(batch, batch_targets): 
-            
-            samples = samples.to(device)
-            samples = samples.unsqueeze(0)
-            outputs = model(samples)
-            # logits and class_labels of point proposals, to be populated
-            points = []
-            class_labels = []
-
-            outputs_points = outputs["pred_points"][0]
-            target_labels = targets["labels"].detach().numpy().tolist()
-            gt_cnt = targets["point"].shape[0]
-
-            # matcher
-            indices = matcher(outputs, targets, pointmatch=True)
-
-            # get the final output points
-            # 0.5 is used by default
-            threshold = 0.5
-
-            # get the predicted points
-            pred_logits = outputs["pred_logits"][0]    
-            output_scores = torch.nn.functional.softmax(outputs["pred_logits"], -1)[:, :, 1][0]
-            points = (
-                    outputs_points[output_scores > threshold]
-                    .detach()
-                    .cpu()
-                    .numpy()
-                    .tolist()
-                )
-
-            # create empty list for confusion labels
-            confusion_matrix = torch.full(
-                (1, output_scores[0].size())
-                0, 
-            )
-
-            #  use indicies to get the correct 
-
-            # assign to each proposal point:
-            # 0 - TN , 1- TP ,  2 - FN , 3 - FP 
-            for batch in range(confusion_matrix.size(0)):
-                for i in range(confusion_matrix.size(1)):
-                    # if the target class  is 0 (TN) and the src class is 0 (TN) 
-                    ground = target_classes[batch, i]
-                    src_pred = torch.argmax(pred_logits[batch, i]).item()
-
-                    if (ground == 1) and (src_pred == 1):
-                        confusion_matrix[batch, i] = 1
-                    elif (ground == 1) and (src_pred == 0):
-                        confusion_matrix[batch, i] = 2
-                    elif (ground == 0) and (src_pred == 1):
-                        confusion_matrix[batch, i] = 3
-            
-    
-
-
-                        
-            outputs_scores = torch.nn.functional.softmax(outputs["pred_logits"], -1)[:, :, 1][0]
-            points = (
-                outputs_points[outputs_scores > threshold]
-                .detach()
-                .cpu()
-                .numpy()
-                .tolist()
-            )
-            cnt = len(points)
-            predict_cnt += cnt
-            gt_count.append([len(target_labels)])
-            count.append([cnt])
-'''
  
+    mae,mse = metric_mae_mse(model, data_loader, device=device, vis_dir=vis_dir)
+
+
+    # calculate localization metrics
+    loc_dict = {}
+    for val in [4,8]:
+        prec, rec, f1 = metric_precision_recall_f1(model, data_loader, device=device, threshold=val)
+        loc_dict[f"{val}"] = (prec, rec, f1)
+
+    return mae, mse, loc_dict

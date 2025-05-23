@@ -209,7 +209,7 @@ def get_args_parser():
         "--patch_size", type=int, default=512, help="size of the patches"
     )
 
-    parser.add_argument("--gnn_layers", default=3, type=int, help="number of GNN layers")
+    parser.add_argument("--gnn_layers", default=1, type=int, help="number of GNN layers")
 
     parser.add_argument("--knn", default=4, type=int, help="number of nearest neighbors for KNN graph construction")
 
@@ -477,6 +477,9 @@ def main(args):
     mae = []
     mse = []
     loss = []
+    recall = []
+    prec = []
+    f1 = []
     min_loss = 100.0
     # the logger writer
     writer = SummaryWriter(tb_path)
@@ -570,6 +573,55 @@ def main(args):
 
             mae.append(result[0])
             mse.append(result[1])
+            prec.append(result[2]['4'][0])
+            recall.append(result[2]['4'][1])
+            f1.append(result[2]['4'][2])
+
+
+            # save the best model with best average count error
+            if abs(np.min(mae) - result[0]) < 0.01:
+                checkpoint_best_path = os.path.join(weight_path, "best_mae.pth")
+                torch.save(
+                    {
+                        "model": model_without_ddp.state_dict(),
+                    },
+                    checkpoint_best_path,
+                )
+            
+            # save for the best precision 
+            if (np.min(prec) - result[2]['4'][0]) < 0.001:
+                checkpoints_best_path = os.path.join(weight_path, "best_precision.pth")
+                torch.save(
+                    {
+                        "model": model_without_ddp.state_dict(),
+                    },
+                    checkpoint_best_path,
+                )
+
+            if (np.min(recall) - result[2]['4'][1]) < 0.001:
+                checkpoints_best_path = os.path.join(weight_path, "best_recall.pth")
+                torch.save(
+                    {
+                        "model": model_without_ddp.state_dict(),
+                    },
+                    checkpoint_best_path,
+                )
+
+            if (np.min(f1) - result[2]['4'][2]) < 0.001:
+                checkpoints_best_path = os.path.join(weight_path, "best_f1.pth")
+                torch.save(
+                    {
+                        "model": model_without_ddp.state_dict(),
+                    },
+                    checkpoint_best_path,
+                )
+
+
+            mae.append(result[0])
+            mse.append(result[1])
+            prec.append(result[2]['4'][0])
+            recall.append(result[2]['4'][1])
+            f1.append(result[2]['4'][2])
             # print the evaluation results
             print(
                 "=======================================test======================================="
@@ -579,6 +631,8 @@ def main(args):
                 result[0],
                 "mse:",
                 result[1],
+                "prec/rec/f1",
+                result[2],
                 "time:",
                 t2 - t1,
                 "best mae:",
@@ -601,16 +655,6 @@ def main(args):
                 writer.add_scalar("metric/mae", result[0], step)
                 writer.add_scalar("metric/mse", result[1], step)
                 step += 1
-
-            # save the best model with best average count error
-            if abs(np.min(mae) - result[0]) < 0.01:
-                checkpoint_best_path = os.path.join(weight_path, "best_mae.pth")
-                torch.save(
-                    {
-                        "model": model_without_ddp.state_dict(),
-                    },
-                    checkpoint_best_path,
-                )
 
     # total time for training
     total_time = time.time() - start_time

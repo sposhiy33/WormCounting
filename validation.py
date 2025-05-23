@@ -48,6 +48,10 @@ def get_arg_parser():
     parser.add_argument("--patch_size", type=int, default=512) 
     parser.add_argument("--dataset_file", default="WORM_VAL")
     
+    parser.add_argument("--gnn_layers", default=1, type=int, help="number of GNN layers")
+
+    parser.add_argument("--knn", default=4, type=int, help="number of nearest neighbors for KNN graph construction")
+    
     parser.add_argument(
         "--multiclass",
         nargs="+",
@@ -95,6 +99,18 @@ def get_arg_parser():
         "--mlp",
         action='store_true',
         help="option to build a model with a MLP at the end"
+    )
+
+    parser.add_argument(
+        "--gat",
+        action='store_true',
+        help="option to build a model with GAT"
+    )
+    
+    parser.add_argument(
+        "--confusion",
+        action='store_true',
+        help="option to build a model with GAT"
     )
 
     parser.add_argument(

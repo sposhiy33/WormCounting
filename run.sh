@@ -6,7 +6,7 @@ CUDA_VISIBLE_DEVICES=0 python train.py --expname $1 --data_root $2 \
     --epochs 400 \
     --lr_drop 100 \
     --output_dir ./results/ \
-    --lr 0.0001 \
+    --lr 0.05 \
     --lr_backbone 0.00001 \
     --batch_size 3 \
     --num_patches 4 \

@@ -106,6 +106,7 @@ class ClassificationModel(nn.Module):
 
         return out2.contiguous().view(x.shape[0], -1, self.num_classes)
 
+
 # generate the reference points in grid layout
 def generate_anchor_points(stride=16, row=3, line=3):
     row_step = stride / row
@@ -276,7 +277,6 @@ class P2PNet(nn.Module):
         return out
 
 
-
 """
 Create objective function for the P2P pipeline, both classification and regression
     1. (LOSS) CE Loss
@@ -293,7 +293,6 @@ Create objective function for the P2P pipeline, both classification and regressi
             penalizes points that are too close together, ad hoc way of minimizing double counting.
 
 """
-
 class SetCriterion_Crowd(nn.Module):
 
     def __init__(self, num_classes, matcher, weight_dict, eos_coef, ce_coef, map_res, gauss_kernel_res, losses):
@@ -621,7 +620,6 @@ class SetCriterion_Crowd(nn.Module):
             classwise_losses.update(classwise)
 
         return losses, classwise_losses
-
 
 # create the P2PNet model
 def build_p2p(args, training):
