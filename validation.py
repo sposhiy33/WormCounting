@@ -15,6 +15,8 @@ import torch
 from tensorboardX import SummaryWriter
 from torch.utils.data import DataLoader, DistributedSampler
 
+os.environ['OPENCV_LOG_LEVEL'] = 'ERROR     '
+
 from crowd_datasets import build_dataset
 from engine import *
 from models import build_model
@@ -28,8 +30,12 @@ def get_arg_parser():
     parser.add_argument("--backbone", type=str, default="vgg16_bn")
 
     # path parameters
-    parser.add_argument("--weight_path", type=str)
-    parser.add_argument("--weight_type", type=str, choices=['best_mae.pth', 'best_training_loss.pth'])
+    parser.add_argument("--weight_type", type=str, choices=['best_mae.pth', 
+                                                            'best_training_loss.pth', 
+                                                            'best_mse.pth',
+                                                            'best_recall.pth',
+                                                            'best_precision.pth',
+                                                            'best_f1.pth'])
     parser.add_argument("--result_dir", type=str)
     parser.add_argument("--val_set", type=str)
 
@@ -98,7 +104,13 @@ def get_arg_parser():
     parser.add_argument(
         "--mlp",
         action='store_true',
-        help="option to build a model with a MLP at the end"
+        help="option to build a model with MLP for classification and point offest prediction"
+    )
+
+    parser.add_argument(
+        "--mlp_classifier",
+        action='store_true',
+        help="option to build a model with MLP for classification only predicition"
     )
 
     parser.add_argument(
@@ -142,11 +154,11 @@ def main(args):
     model = build_model(args)
     matcher = build_matcher_crowd(args)
     args.num_classes = len(args.multiclass)
-    args.weight_path = os.path.join(args.result_dir,f"weights/{args.weight_type}")
+    weight_path = os.path.join(args.result_dir,f"weights/{args.weight_type}")
 
 
     # load the trained network
-    checkpoint = torch.load(args.weight_path, map_location="cpu")
+    checkpoint = torch.load(weight_path, map_location="cpu")
     model.load_state_dict(checkpoint["model"])
 
     model.to(device)
@@ -181,7 +193,7 @@ def main(args):
     # if not specific evaluation set is specified, evaluated on 
     # the sets given in 'datset_list'
     if args.val_set == None:
-        for i, key in enumerate(list(dataset_list.keys())):
+        for key in list(dataset_list.keys()):
 
             print(key)
             dataroot = dataset_list[key]
@@ -263,7 +275,7 @@ def main(args):
                 print(result)
                 print("")
 
-    # otherwise, just use dataset specified in args.val_set
+    # otherwise, use dataset specified in args.val_set
     else:
         # create the training and valiation set
         train_set, val_set = loading_data(
@@ -280,12 +292,17 @@ def main(args):
         # create the sampler used during training
         sampler_val = torch.utils.data.SequentialSampler(val_set)
 
+        weight_metric = args.weight_type.replace("best_", "").replace(".pth", "")
+        print(weight_metric)
+
         result_path = None
         if args.result_dir != None:
-            result_path = os.path.join(args.result_dir, f"vis")
+            result_path = os.path.join(args.result_dir, f"{weight_metric}_vis")
             if os.path.isdir(result_path):
                 shutil.rmtree(result_path)
             os.mkdir(result_path)
+
+        print(result_path)
 
         data_loader_val = DataLoader(
             val_set,

@@ -266,12 +266,10 @@ class P2PNet(nn.Module):
         regression = self.regression(features_fpn[1]) * 100  # 8x
         classification = self.classification(features_fpn[1])
         anchor_points = self.anchor_points(samples).repeat(batch_size, 1, 1)
-        # decode the points as prediction
-        if self.noreg==True: 
-            output_coord = anchor_points
-        else: 
-            output_coord = regression + anchor_points
+        
+        output_coord = regression + anchor_points
         output_class = classification
+        
         out = {"pred_logits": output_class, "pred_points": output_coord}
 
         return out
@@ -329,6 +327,11 @@ class SetCriterion_Crowd(nn.Module):
         self.kernel = np.outer(gauss, gauss)
         # Calculate the 2D Gaussian function
         self.kernel = self.kernel / np.sum(self.kernel)
+
+        # auxillary loss params
+        self.aux_number = [2, 2]
+        self.aux_range = [2, 8]
+        self.aux_kwargs = {'pos_coef': 1., 'neg_coef': 1., 'pos_loc': 0.0002, 'neg_loc': 0.0002} 
             
     def loss_labels(self, outputs, targets, indices, num_points, samples):
         """Classification loss (NLL)
@@ -363,6 +366,9 @@ class SetCriterion_Crowd(nn.Module):
         return losses, class_losses
 
     def loss_points(self, outputs, targets, indices, num_points, samples):
+        '''
+        Calculate L2 distance between matched points
+        '''
 
         assert "pred_points" in outputs
         idx = self._get_src_permutation_idx(indices)
@@ -560,6 +566,57 @@ class SetCriterion_Crowd(nn.Module):
             total_mean.append(mean)
         mean = torch.mean(torch.Tensor(total_mean), dim=-1)
         return {"loss_distance": (1.0 / mean).to("cuda")}, {"class_loss_distance": 1.0}
+    
+    def loss_auxiliary(self, outputs, targets, indicies, num_points, samples):
+        '''
+        Auxillary points guidance, straight from the APGCC
+        https://github.com/AaronCIH/APGCC/blob/main/apgcc/models/APGCC.py 
+        '''
+        # out: {"pred_logits", "pred_points", "offset"}
+        # aux_out: {"pos0":out, "pos1":out, "neg0":out, "neg1":out, ...}
+        loss_aux_pos = 0.
+        loss_aux_neg = 0.
+        loss_aux = 0.
+        for n_pos in range(self.aux_number[0]):
+            src_outputs = outputs['pos%d'%n_pos]
+            # cls loss
+            pred_logits = src_outputs['pred_logits'] # size=[1, # of gt anchors, 2] [p0, p1]
+            target_classes = torch.ones(pred_logits.shape[:2], dtype=torch.int64, device=pred_logits.device) # [1, # of gt anchors], all sample is the head class
+            loss_ce_pos = F.cross_entropy(pred_logits.transpose(1, 2), target_classes)
+            # loc loss
+            pred_points = src_outputs['pred_points'][0]
+            target_points = torch.cat([t['point'] for t in targets], dim=0)
+            target_points = target_points.repeat(1, int(pred_points.shape[0]/target_points.shape[0]))
+            target_points = target_points.reshape(-1, 2)
+            loss_loc_pos = F.mse_loss(pred_points, target_points, reduction='none')
+            loss_loc_pos = loss_loc_pos.sum() / pred_points.shape[0]
+            loss_aux_pos += loss_ce_pos + self.aux_kwargs['pos_loc'] * loss_loc_pos
+        loss_aux_pos /= (self.aux_number[0] + 1e-9)
+
+        for n_neg in range(self.aux_number[1]):
+            src_outputs = outputs['neg%d'%n_neg]
+            # cls loss
+            pred_logits = src_outputs['pred_logits'] # size=[1, # of gt anchors, 2] [p0, p1]
+            target_classes = torch.zeros(pred_logits.shape[:2], dtype=torch.int64, device=pred_logits.device) # [1, # of gt anchors], all sample is the head class
+            loss_ce_neg = F.cross_entropy(pred_logits.transpose(1, 2), target_classes)
+            # loc loss
+            pred_points = src_outputs['offset'][0]
+            target_points = torch.zeros(pred_points.shape, dtype=torch.float, device=pred_logits.device)
+            loss_loc_neg = F.mse_loss(pred_points, target_points, reduction='none')
+            loss_loc_neg = loss_loc_neg.sum() / pred_points.shape[0]
+            loss_aux_neg += loss_ce_neg + self.aux_kwargs['neg_loc'] * loss_loc_neg
+        loss_aux_neg /= (self.aux_number[1] + 1e-9)
+        
+        # show the output for the program; for debugging purposes
+        if True:
+            if self.aux_number[0] > 0:
+                print("Auxiliary Training: [Pos] loss_cls:", loss_ce_pos, " loss_loc:", loss_loc_pos, " loss:", loss_aux_pos)
+            if self.aux_number[1] > 0:
+                print("Auxiliary Training: [Neg] loss_cls:", loss_ce_neg, " loss_loc:", loss_loc_neg, " loss:", loss_aux_neg)
+
+        loss_aux = self.aux_kwargs['pos_coef']*loss_aux_pos + self.aux_kwargs['neg_coef']*loss_aux_neg
+        losses = {'loss_aux': loss_aux}
+        return losses, None     # TODO: Implement classiwse loss for the auxillary formulation
 
     def _get_src_permutation_idx(self, indices):
         # permute predictions following indices
@@ -584,6 +641,7 @@ class SetCriterion_Crowd(nn.Module):
             "density": self.loss_dense,
             "count": self.loss_count,
             "distance": self.loss_distance,
+            "aux": self.loss_auxiliary,
         }
         assert loss in loss_map, f"do you really want to compute {loss} loss?"
         return loss_map[loss](outputs, targets, indices, num_points, samples, **kwargs)
@@ -636,6 +694,7 @@ def build_p2p(args, training):
         "loss_dense": args.dense_loss_coef,
         "loss_distance": args.distance_loss_coef,
         "loss_count": args.count_loss_coef,
+        "loss_aux": args.aux_loss_coef,
     }
     losses = args.loss
     matcher = build_matcher_crowd(args)

@@ -12,6 +12,8 @@ from tensorboardX import SummaryWriter
 from torch.utils.data import DataLoader, DistributedSampler
 from torchinfo import summary
 
+os.environ['OPENCV_LOG_LEVEL'] = 'ERROR     '
+
 from crowd_datasets import build_dataset
 from engine import *
 from models import build_model
@@ -84,7 +86,7 @@ def get_args_parser():
         type=str,
         help="specify which terms to include in the loss",
         default=["labels", "points"],
-        choices=["labels", "points", "density", "count", "distance"],
+        choices=["labels", "points", "density", "count", "distance", "aux"],
     )
     # * Loss coefficients (guide training scheme)
     
@@ -114,6 +116,7 @@ def get_args_parser():
         type=float,
         help="loss weight of count estimation loss",
     )
+    
     parser.add_argument(
         "--distance_loss_coef",
         default=1,
@@ -122,11 +125,19 @@ def get_args_parser():
     )
 
     parser.add_argument(
+        "--aux_loss_coef",
+        default=1,
+        type=float,
+        help="loss weight of auxillary points guidance term",
+    )
+
+    parser.add_argument(
         "--eos_coef",
         default=0.5,
         type=float,
         help="Relative classification weight of the no-object class",
     )
+
     parser.add_argument(
         "--ce_coef",
         nargs="+",
@@ -150,12 +161,13 @@ def get_args_parser():
     parser.add_argument(
         "--row", default=3, type=int, help="row number of anchor points"
     )
+    
     parser.add_argument(
         "--line", default=3, type=int, help="line number of anchor points"
     )
 
     # dataset parameters
-    parser.add_argument("--dataset_file", default="SHHA")
+    parser.add_argument("--dataset_file", default="WORM")
     parser.add_argument(
         "--data_root",
         default="./new_public_density_data",
@@ -228,13 +240,6 @@ def get_args_parser():
     )
 
     parser.add_argument(
-        "--noreg",
-        action="store_true",
-        help="set regression branch to zero, so that ground truth points are not offset,\
-                used for debugging pruposes",
-    )
-
-    parser.add_argument(
         "--classifier",
         action="store_true",
         help="option to intialize network with only the classifiation branch"
@@ -243,13 +248,13 @@ def get_args_parser():
     parser.add_argument(
         "--mlp",
         action='store_true',
-        help="option to build a model with a MLP at the end"
+        help="option to build a model with MLP for classification and point offest prediction"
     )
 
     parser.add_argument(
-        "--confusion",
+        "--mlp_classifier",
         action='store_true',
-        help="option to build model that optimizes confusion matrix"
+        help="option to build a model with MLP for classification only predicition"
     )
 
     parser.add_argument(
@@ -260,6 +265,7 @@ def get_args_parser():
 
     parser.add_argument("--eval", action="store_true")
     parser.add_argument("--num_workers", default=8, type=int)
+    
     parser.add_argument(
         "--eval_freq",
         default=5,
@@ -289,10 +295,6 @@ def main(args):
     make_dir(weight_path)
 
     print(args.ce_coef)
-
-    # make an extra directory meant for visualizations
-    vis_path = os.path.join(result_path, "viz")
-    make_dir(vis_path)
 
     # create the logging file
     run_log_name = os.path.join(result_path, "run_log.txt")
@@ -410,25 +412,6 @@ def main(args):
         num_workers=args.num_workers,
     )
 
-    # get count stats
-
-    #    data_loader_train_stats = DataLoader(
-    #        train_set_stats,
-    #        batch_size=1)
-    #    count = []
-    #    train_iter = iter(data_loader_train_stats)
-    #    for i, classtype in enumerate(args.multiclass):
-    #        class_count = []
-    #        for batch in range(len(data_loader_train_stats)):
-    #            try:
-    #                sample, target = next(train_iter)
-    #            except: pass
-    #            for x in target:
-    #                truth = (x["labels"] == i+1)
-    #                class_count.append(torch.sum(truth.int()).item())
-    #        count.append(sum(class_count))
-    #    print(count)
-
     data_loader_val = DataLoader(
         val_set,
         1,
@@ -464,23 +447,28 @@ def main(args):
             "=======================================test======================================="
         )
 
-    if args.noreg:
-        for params in model.regression.parameters():
-            params.requires_grad = False
-        model.regression.eval()
-
+    # print the model summary
     print(summary(model, input_size=(4, 3, 512, 512)))
 
     print("Start training")
     start_time = time.time()
-    # save the performance during the training
+
+    # list for epoch wise metrics
     mae = []
     mse = []
     loss = []
     recall = []
     prec = []
     f1 = []
-    min_loss = 100.0
+
+    # best metrics -- to be updated throughout training 
+    min_loss = np.inf
+    min_mae = np.inf
+    min_mse = np.inf
+    max_recall = -np.inf
+    max_prec = -np.inf
+    max_f1 = -np.inf
+
     # the logger writer
     writer = SummaryWriter(tb_path)
 
@@ -553,12 +541,6 @@ def main(args):
             # update min loss
             min_loss = np.min(loss)
 
-        # run classwise loss evaluation
-        # avg_class = avg_class_loss(class_stat, writer, epoch)
-        # print(
-        #     f"Avg Classwise loss:     loss_ce: {avg_class[0]}     loss_point: {avg_class[1]}"
-        # )
-
         # run evaluation
         if epoch % args.eval_freq == 0 and epoch != 0:
             t1 = time.time()
@@ -571,15 +553,9 @@ def main(args):
             )
             t2 = time.time()
 
-            mae.append(result[0])
-            mse.append(result[1])
-            prec.append(result[2]['4'][0])
-            recall.append(result[2]['4'][1])
-            f1.append(result[2]['4'][2])
-
-
-            # save the best model with best average count error
-            if abs(np.min(mae) - result[0]) < 0.01:
+            # save model based on best mae    
+            if min_mae > result[0]:
+                # save model
                 checkpoint_best_path = os.path.join(weight_path, "best_mae.pth")
                 torch.save(
                     {
@@ -587,35 +563,61 @@ def main(args):
                     },
                     checkpoint_best_path,
                 )
-            
-            # save for the best precision 
-            if (np.min(prec) - result[2]['4'][0]) < 0.001:
-                checkpoints_best_path = os.path.join(weight_path, "best_precision.pth")
+                # update the new min
+                min_mae = result[0]
+
+            # save model based on best mse    
+            if min_mse > result[1]:
+                # save model
+                checkpoint_best_path = os.path.join(weight_path, "best_mse.pth")
                 torch.save(
                     {
                         "model": model_without_ddp.state_dict(),
                     },
                     checkpoint_best_path,
                 )
+                # update the new min
+                min_mse = result[1]
 
-            if (np.min(recall) - result[2]['4'][1]) < 0.001:
-                checkpoints_best_path = os.path.join(weight_path, "best_recall.pth")
+
+            # save model with best precision performance
+            if max_prec < result[2]['4'][0]:
+                # save model
+                checkpoint_best_path = os.path.join(weight_path, "best_precision.pth")
                 torch.save(
                     {
                         "model": model_without_ddp.state_dict(),
                     },
                     checkpoint_best_path,
                 )
+                # update min
+                max_prec = result[2]['4'][0] 
 
-            if (np.min(f1) - result[2]['4'][2]) < 0.001:
-                checkpoints_best_path = os.path.join(weight_path, "best_f1.pth")
+            # save model with best recall performance
+            if max_recall < result[2]['4'][1]:
+                # save model
+                checkpoint_best_path = os.path.join(weight_path, "best_recall.pth")
                 torch.save(
                     {
                         "model": model_without_ddp.state_dict(),
                     },
                     checkpoint_best_path,
                 )
+                # update min
+                max_recall = result[2]['4'][1] 
 
+            # save model with best f1 performance
+            if max_f1 < result[2]['4'][2]:
+                # save model
+                checkpoint_best_path = os.path.join(weight_path, "best_f1.pth")
+                torch.save(
+                    {
+                        "model": model_without_ddp.state_dict(),
+                    },
+                    checkpoint_best_path,
+                )
+                # update min
+                max_f1 = result[2]['4'][2] 
 
             mae.append(result[0])
             mse.append(result[1])

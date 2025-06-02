@@ -1,5 +1,7 @@
 '''
-GAT (Graph Attention Network) based network for proposal point classification (node classification).
+GNN forumulations for the crowd counting model. GNN variants: 
+    1. GAT (Graph Attention Network)
+    2. GCN (Graph Convolutional Network)
 '''
 
 
@@ -44,6 +46,7 @@ class GATClassifier(nn.Module):
         self.num_gat_layers = gnn_layers # Number of GAT layers (determines message passing depth)
         self.dropout_rate = 0.6 # Dropout rate 
         self.k = knn  # Number of nearest neighbors for KNN graph construction
+        self.loop= False
 
         num_anchor_points = row * line
 
@@ -72,6 +75,42 @@ class GATClassifier(nn.Module):
 
         self.fpn = Decoder(256, 512, 512)
 
+    def create_edges(self, square_dim:int, batch_size:int):
+        """
+        square_dim -> number of proposal points in a square grid of initialized points
+        knn -> number of points to make connections to; choices = [4,8]
+        """
+        # create edge index for the entire batch, based on specified number of neighbors
+        if self.k == 4:
+            # undirected graph, so (a,b) and (b,a) are included
+            edge_pairs = []
+
+            # batch index loop
+            for b in range(batch_size):
+                # point index loop
+                # get start and end index of the anchor points (relative position in the batch)
+                start = b * (square_dim**2)
+                end = start + (square_dim**2)
+
+                for p in np.arange(start, end):
+                    # add in the 4 cardinal directions
+                    if p+1 <= end : edge_pairs.append([p, p+1])
+                    if p-1 >= start : edge_pairs.append([p,p-1])
+                    if p-square_dim >= start : edge_pairs.append([p,p-square_dim])
+                    if p+square_dim <= end : edge_pairs.append([p,p+square_dim])
+                
+                    if self.loop:
+                        edge_pairs.append([p,p])
+
+            # trasnform edge pair to tensor
+            edge_pairs = torch.tensor(edge_pairs).type(torch.LongTensor)
+            edge_pairs = edge_pairs.permute(1,0)
+            
+        elif self.k == 8:
+            pass
+
+        return edge_pairs
+
     def forward(self, samples: NestedTensor):
         # get the backbone features
         features = self.backbone(samples)
@@ -93,13 +132,14 @@ class GATClassifier(nn.Module):
 
         # create the batch index for the KNN graph (seperate graph for each sample in batch)
         batch_index = torch.arange(batch_size).repeat_interleave(anchor_points.shape[1]) 
-        # create the KNN graph 
-        edge_index = knn_graph(flat_coords, k=self.k, batch=batch_index, loop=True)
-        data = Batch(x=flat_features, edge_index=edge_index, batch=batch_index)
 
+        # create edge index
+        edge_index = self.create_edges(feat_space.size(2), batch_size)
+        edge_index = edge_index.to(batch_features.device)
+
+        data = Batch(x=flat_features, edge_index=edge_index, batch=batch_index)
         # pass through the GAT classifier
         classification = self.gat_classifier(data)
-
         # reshape GNN output back to batch formate
         classification = classification.view(batch_size, -1, self.num_classes)
 
@@ -108,9 +148,7 @@ class GATClassifier(nn.Module):
         output_class = classification
         
         out = {"pred_logits": output_class, "pred_points": output_coord}
-
         return out 
-
 
 
 # --- Graph Attention Network (GAT) Model for Node Classification ---
@@ -144,7 +182,6 @@ class GATNodeClassifier(nn.Module):
         x = self.convs[-1](x, edge_index)
 
         return x # Output logits for each node (proposal point)
-
 
 def build_gat_classifier(args, training):
     

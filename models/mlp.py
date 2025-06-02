@@ -44,8 +44,8 @@ class Linear(nn.Module):
         return out
 
 
-class MLP(nn.Module):
-    """MLP predictor on top of FPN feature space"""
+class MLP_Classifier(nn.Module):
+    """MLP classifier-only predictor on top of FPN feature space"""
 
     def __init__(self, backbone, num_classes, row=2, line=2):
         super().__init__()
@@ -89,12 +89,69 @@ class MLP(nn.Module):
 
         return out
 
+class MLP(nn.Module):
+    "MLP model for both regression and classification tasks"    
+  
+    def __init__(self, backbone, num_classes, row=2, line=2):
+        super().__init__()
+
+        self.vgg_backbone = backbone
+        self.num_classes = num_classes + 1
+        self.row = row
+        self.line = line
+
+        num_anchor_points = row * line
+
+        self.lin_class = Linear(
+            in_feat=256,
+            out_feat=self.num_classes,
+        )
+
+        self.lin_reg = Linear(
+            in_feat=256,
+            out_feat=self.num_classes,
+        )
+
+        self.anchor_points = AnchorPoints(
+            pyramid_levels=[
+                3,
+            ],
+            row=row,
+            line=line,
+        )
+
+        self.fpn = Decoder(256, 512, 512)
+
+    def forward(self, samples: NestedTensor):
+        # get the backbone (vgg) features
+        features = self.vgg_backbone(samples)
+        # construct the feature space
+        features_fpn = self.fpn([features[1], features[2], features[3]])
+        batch_size = features[0].shape[0]
+
+        # pass sample through classification and regression branch
+        classification = self.lin_class(features_fpn[1])
+        regression = self.lin_reg(features_fpn[1])
+        anchor_points = self.anchor_points(samples).repeat(batch_size, 1, 1)
+        
+        output_coord = regression + anchor_points
+        output_class = classification
+
+        out = {"pred_logits": output_class, "pred_points": output_coord}
+
+        return out
 
 
 def build_mlp(args, training):
 
     backbone = build_backbone(args)
-    model = MLP(backbone, args.num_classes, args.row, args.line)
+
+    # model selection logic
+    if args.mlp_classifier:
+        model = MLP_Classifier(backbone, args.num_classes, args.row, args.line)
+    elif args.mlp:
+        model = MLP(backbone, args.num_classes, args.row, args.line)
+    
     if not training:
         return model
 
@@ -105,6 +162,7 @@ def build_mlp(args, training):
         "loss_distance": args.distance_loss_coef,
         "loss_count": args.count_loss_coef,
     }
+
     losses = args.loss
     matcher = build_matcher_crowd(args)
     criterion = SetCriterion_Crowd(
