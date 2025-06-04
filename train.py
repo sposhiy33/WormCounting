@@ -581,7 +581,7 @@ def main(args):
 
 
             # save model with best precision performance
-            if max_prec < result[2]['4'][0]:
+            if max_prec < result[2]['1'][0]:
                 # save model
                 checkpoint_best_path = os.path.join(weight_path, "best_precision.pth")
                 torch.save(
@@ -591,10 +591,10 @@ def main(args):
                     checkpoint_best_path,
                 )
                 # update min
-                max_prec = result[2]['4'][0] 
+                max_prec = result[2]['1'][0] 
 
             # save model with best recall performance
-            if max_recall < result[2]['4'][1]:
+            if max_recall < result[2]['1'][1]:
                 # save model
                 checkpoint_best_path = os.path.join(weight_path, "best_recall.pth")
                 torch.save(
@@ -604,10 +604,10 @@ def main(args):
                     checkpoint_best_path,
                 )
                 # update min
-                max_recall = result[2]['4'][1] 
+                max_recall = result[2]['1'][1] 
 
             # save model with best f1 performance
-            if max_f1 < result[2]['4'][2]:
+            if max_f1 < result[2]['1'][2]:
                 # save model
                 checkpoint_best_path = os.path.join(weight_path, "best_f1.pth")
                 torch.save(
@@ -617,13 +617,13 @@ def main(args):
                     checkpoint_best_path,
                 )
                 # update min
-                max_f1 = result[2]['4'][2] 
+                max_f1 = result[2]['1'][2] 
 
             mae.append(result[0])
             mse.append(result[1])
-            prec.append(result[2]['4'][0])
-            recall.append(result[2]['4'][1])
-            f1.append(result[2]['4'][2])
+            prec.append(result[2]['1'][0])
+            recall.append(result[2]['1'][1])
+            f1.append(result[2]['1'][2])
             # print the evaluation results
             print(
                 "=======================================test======================================="

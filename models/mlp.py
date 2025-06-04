@@ -131,7 +131,7 @@ class MLP(nn.Module):
 
         # pass sample through classification and regression branch
         classification = self.lin_class(features_fpn[1])
-        regression = self.lin_reg(features_fpn[1])
+        regression = self.lin_reg(features_fpn[1]) * 100
         anchor_points = self.anchor_points(samples).repeat(batch_size, 1, 1)
         
         output_coord = regression + anchor_points
@@ -140,7 +140,6 @@ class MLP(nn.Module):
         out = {"pred_logits": output_class, "pred_points": output_coord}
 
         return out
-
 
 def build_mlp(args, training):
 

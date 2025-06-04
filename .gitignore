@@ -3,7 +3,7 @@ results/
 log/
 weights/
 pretrained/
-**/__pycache__/
+__pycache__/
 nohup.out
 .nohup.out.swp
 eval_root/
@@ -11,3 +11,4 @@ eval_viz/
 dataroot
 results
 *.db
+modeltohub.py

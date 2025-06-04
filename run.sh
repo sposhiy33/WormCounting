@@ -12,15 +12,15 @@ CUDA_VISIBLE_DEVICES=0 python train.py --expname $1 --data_root $2 \
     --num_patches 4 \
     --patch_size 512 \
     --eval_freq 1 \
-    --gpu_id 0 \
+    --gpu_id 1 \
     --row 1 \
     --line 1 \
     --point_loss_coef 0.0002 \
     --aux_loss_coef 0.2 \
-    --loss labels \
+    --loss labels points \
     --scale \
     --sharpness \
     --equalize \
-    --gat
+    --mlp
     # --resume results/multiclass_mixedimg/weights/best_mae.pth \
 	#--freeze_regression

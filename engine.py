@@ -371,10 +371,9 @@ def evaluate_crowd_no_overlap(
  
     mae,mse = metric_mae_mse(model, data_loader, device=device, vis_dir=vis_dir)
 
-
     # calculate localization metrics
     loc_dict = {}
-    for val in [4,8]:
+    for val in [1,4,8]:
         prec, rec, f1 = metric_precision_recall_f1(model, data_loader, device=device, threshold=val)
         loc_dict[f"{val}"] = (prec, rec, f1)
 

@@ -160,12 +160,13 @@ class GATNodeClassifier(nn.Module):
 
         self.convs = nn.ModuleList()
         # Input layer: Apply GAT and project to hidden_channels * num_heads
+        # In: (|V|, dim) -> Out: (|V|, H*dim)
         self.convs.append(GATConv(in_channels, hidden_channels, heads=num_heads, dropout=dropout))
         # Hidden layers: Take concatenated output from previous layer
         for _ in range(num_layers - 2):
             self.convs.append(GATConv(hidden_channels * num_heads, hidden_channels, heads=num_heads, dropout=dropout))
         # Output layer: Project to final out_channels with a single head
-        # The output layer of a node classification GAT typically uses heads=1
+        # In: (|V|, H*dim) -> Out: (|V|, out_channels)
         self.convs.append(GATConv(hidden_channels * num_heads, out_channels, heads=1, dropout=dropout))
 
     def forward(self, data):
@@ -175,13 +176,13 @@ class GATNodeClassifier(nn.Module):
         for i in range(self.num_layers - 1):
             x = F.dropout(x, p=self.dropout, training=self.training)
             x = self.convs[i](x, edge_index)
-            x = F.elu(x) # ELU is a common activation after GAT layers
+            x = F.elu(x)
 
         # Apply output layer
         x = F.dropout(x, p=self.dropout, training=self.training)
         x = self.convs[-1](x, edge_index)
 
-        return x # Output logits for each node (proposal point)
+        return x
 
 def build_gat_classifier(args, training):
     
