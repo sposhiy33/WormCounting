@@ -1,4 +1,4 @@
-CUDA_VISIBLE_DEVICES=0 python train.py --expname $1 --data_root $2 \
+CUDA_VISIBLE_DEVICES=1 python train.py --expname $1 --data_root $2 \
     --dataset_file WORM \
     --multiclass embryo \
     --num_classes 1 \
@@ -17,10 +17,11 @@ CUDA_VISIBLE_DEVICES=0 python train.py --expname $1 --data_root $2 \
     --line 1 \
     --point_loss_coef 0.0002 \
     --aux_loss_coef 0.2 \
-    --loss labels \
+    --loss labels points \
     --scale \
     --sharpness \
     --equalize \
-    --gat
+    --mlp \
     # --resume results/multiclass_mixedimg/weights/best_mae.pth \
-	#--freeze_regression
+	# --freeze_regression \
+    # --salt_and_pepper \

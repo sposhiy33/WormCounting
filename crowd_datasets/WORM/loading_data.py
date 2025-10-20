@@ -17,7 +17,8 @@ def loading_data(
     edges=False,
     sharpness=False,
     patch=False,
-    equalize=False
+    equalize=False,
+    salt_and_pepper=False,
 ):
     
     # the pre-proccssing transform
@@ -50,6 +51,7 @@ def loading_data(
         edges=edges,
         sharpness=sharpness,
         equalize=equalize,
+        salt_and_pepper=salt_and_pepper,
     )
     val_set = WORM(
         data_root,

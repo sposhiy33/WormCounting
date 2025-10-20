@@ -13,8 +13,8 @@ from pathlib import Path
 
 import numpy
 import torch
-from tensorboardX import SummaryWriter
-from torch.utils.data import DataLoader, DistributedSampler
+from tensorboardX import SummdaryWriter
+from torch.utils.data import DataLoader
 from torchinfo import summary
 
 from crowd_datasets import build_dataset

@@ -25,7 +25,7 @@ def get_arg_parser():
 
     # path parameters
     parser.add_argument("--weight_path", type=str)
-    parser.add_argument("--weight_type", type=str, choices=['best_mae.pth', 'best_training_loss.pth'])
+    parser.add_argument("--weight_type", type=str, choices=['best_mae.pth', 'best_training_loss.pth', "best_f1.pth"])
     parser.add_argument("--result_dir", type=str)
     parser.add_argument("--val_set", type=str)
 
@@ -85,6 +85,26 @@ def get_arg_parser():
         action="store_true",
         help="option to intialize network with only the classifiation branch"
     )
+
+    parser.add_argument(
+        "--mlp",
+        action='store_true',
+        help="option to build a model with MLP for classification and point offest prediction"
+    )
+
+    parser.add_argument(
+        "--mlp_classifier",
+        action='store_true',
+        help="option to build a model with MLP for classification only predicition"
+    )
+
+    parser.add_argument(
+        "--gat",
+        action='store_true',
+        help="option to build a model with GAT"
+    )
+
+
 
     ## extra args
     parser.add_argument("--batch_size", default=8, type=int)

@@ -213,7 +213,9 @@ def get_args_parser():
     parser.add_argument(
         "--equalize", action="store_true", help="use histogram equalization during training"
     )
-
+    parser.add_argument(
+        "--salt_and_pepper", action="store_true", help="use salt and pepper noise during training"
+    )
     parser.add_argument(
         "--num_patches", type=int, default=4, help="number of patches to samples from each image"
     )
@@ -378,6 +380,7 @@ def main(args):
         scale=args.scale,
         sharpness=args.sharpness,
         equalize=args.equalize,
+        salt_and_pepper=args.salt_and_pepper,
         patch=True,
         num_patch=args.num_patches,
         patch_size=args.patch_size,
@@ -392,6 +395,7 @@ def main(args):
         scale=args.scale,
         sharpness=args.sharpness,
         equalize=args.equalize,
+        salt_and_pepper=args.salt_and_pepper,
         patch=False,
         num_patch=args.num_patches,
         patch_size=args.patch_size,

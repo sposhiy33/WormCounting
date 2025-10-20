@@ -1,4 +1,3 @@
-import glob
 import math
 import os
 import random
@@ -32,6 +31,7 @@ class WORM(Dataset):
         edges=False,
         sharpness=False,
         equalize=False,
+        salt_and_pepper=False,
     ):
         self.root_path = data_root
 
@@ -87,7 +87,7 @@ class WORM(Dataset):
         self.edges = edges
         self.sharpness = sharpness
         self.equalize = equalize
-        
+        self.salt_and_pepper = salt_and_pepper
 
     def __len__(self):
         return self.nSamples
@@ -113,6 +113,9 @@ class WORM(Dataset):
             sharp_range = [0,2]
             sharpness = random.uniform(*sharp_range)
             img = F.adjust_sharpness(img, sharpness)
+
+        if self.train and self.salt_and_pepper:
+            img = salt_and_pepper(img)
 
         # apply transformation -> tensor, normalization
         if self.transform is not None:
@@ -148,7 +151,7 @@ class WORM(Dataset):
         if self.train and self.rotate:
             # randomly rotate the image
             img, point, labels = random_rotate(img, point, labels, 4)
-
+            
         # random flipping
         if random.random() > 0.5 and self.train and self.flip:
             # random flip
@@ -170,9 +173,7 @@ class WORM(Dataset):
         target = [{} for i in range(len(point))]
         for i, _ in enumerate(point):
             target[i]["point"] = torch.Tensor(point[i])
-            image_id = int(img_path.split("/")[-1].split(".")[0].split("_")[-1])
-            image_id = torch.Tensor([image_id]).long()
-            target[i]["image_id"] = image_id
+            target[i]["image_id"] = torch.Tensor([index]).long()
             target[i]["labels"] = torch.Tensor(labels[i].tolist()).long()
 
         return img, target
@@ -236,7 +237,6 @@ class WORM_eval(Dataset):
                     img.unsqueeze(0), scale_factor=scale
                 ).squeeze(0)
                 point *= scale
-
 
         if self.hsv:
             img = rgb_to_hsv(img)
@@ -306,7 +306,6 @@ def load_data(img_gt_path, train, multiclass):
     return img, np.array(points), np.array(labels)
 
 
-
 def rgb_to_hsv(rgb):
     """
     Implementation taken from: https://github.com/limacv/RGB_HSV_HSL/blob/master/color_torch.py
@@ -369,6 +368,29 @@ def rgb_to_hse(rgb):
 
     return torch.cat([hsv_h, hsv_s, edges], dim=1)
 
+def salt_and_pepper(img):
+    # PIL -> numpy
+    img = np.array(img)
+    
+    # add salt and pepper noise
+    image_size = img.shape
+    num_pixels = image_size[0] * image_size[1]
+    salt_probability = np.random.uniform(0.05, 0.15)
+    pepper_probability = np.random.uniform(0.05, 0.15)
+    num_salt = np.random.binomial(num_pixels, salt_probability)
+    num_pepper = np.random.binomial(num_pixels, pepper_probability)
+
+    # randomly sample coordinates    
+    salt_coords = [[np.random.randint(0, image_size[0]), np.random.randint(0, image_size[1])] for i in range(num_salt)]
+    pepper_coords = [[np.random.randint(0, image_size[0]), np.random.randint(0, image_size[1])] for i in range(num_pepper)]
+
+    # add salt and pepper noise
+    for coord in salt_coords:
+        img[coord[0], coord[1]] = [255, 255, 255]
+    for coord in pepper_coords:
+        img[coord[0], coord[1]] = [0, 0, 0]
+
+    return Image.fromarray(img)
 
 def edges(rgb):
     blurSize = 10
@@ -584,40 +606,89 @@ def random_crop(img, den, labels, edge_image = None, num_patch: int = 4, patch_s
     else: result_img = np.zeros([num_patch*2, img.shape[0], half_h, half_w]) 
     result_den = []
     result_lab = []
+
+    print(den.shape, len(den), len(labels))
+    # Ensure den has the correct shape (N, 2) even if empty
+    if len(den.shape) == 1:
+        # If den is 1D, reshape it to (0, 2) if empty, or (N, 2) if not
+        if len(den) == 0:
+            den = np.array([]).reshape(0, 2)
+        else:
+            den = den.reshape(-1, 2)
     
-    # crop num_patch for each image
-    # keep sampling patches until all have non-zero number of samples in them (hence the while loop)
-    current_count = 0
-            
-    while current_count < num_patch:
+    # Ensure labels has the correct shape
+    if len(labels.shape) == 0:
+        labels = np.array([])
+    elif len(labels.shape) == 1 and len(labels) == 0:
+        labels = np.array([])
+
+    # normal patch sampling
+    for i in range(num_patch):
         start_h = random.randint(0, img.size(1) - half_h)
         start_w = random.randint(0, img.size(2) - half_w)
         end_h = start_h + half_h
         end_w = start_w + half_w
-        # copy the cropped points
-        if den.shape[0] > 0: 
+        
+        result_img[i] = img[:, start_h:end_h, start_w:end_w]
+
+        # Handle empty annotations
+        if len(den) == 0:
+            # No annotations, create empty arrays
+            record_den = np.array([]).reshape(0, 2)
+            record_lab = np.array([])
+
+        else:
             idx = (
                 (den[:, 0] >= start_w)
                 & (den[:, 0] <= end_w)
                 & (den[:, 1] >= start_h)
                 & (den[:, 1] <= end_h)
             )
-            # shift the corrdinates
+            
             record_den = den[idx]
             record_lab = labels[idx]
-        else:
-            record_den = den
+            
+            record_den[:, 0] -= start_w
+            record_den[:, 1] -= start_h
+        
+        result_den.append(record_den)
+        result_lab.append(record_lab)
+
+
+    # crop num_patch for each image
+    # keep sampling patches until all have non-zero number of samples in them (hence the while loop)
+    # current_count = 0
+            
+    # while current_count < num_patch:
+        
+    #     start_h = random.randint(0, img.size(1) - half_h)
+    #     start_w = random.randint(0, img.size(2) - half_w)
+    #     end_h = start_h + half_h
+    #     end_w = start_w + half_w
+    #     # copy the cropped points
+    #     if den.shape[0] > 0: 
+    #         idx = (
+    #             (den[:, 0] >= start_w)
+    #             & (den[:, 0] <= end_w)
+    #             & (den[:, 1] >= start_h)
+    #             & (den[:, 1] <= end_h)
+    #         )
+    #         # shift the corrdinates
+    #         record_den = den[idx]
+    #         record_lab = labels[idx]
+    #     else:
+    #         record_den = den
 
         # gaurentee that each patch sample has point in it 
         # if so then proceed with sampling the patch from the image
-        if len(record_den) > 0:
-            # copy the cropped rect
-            result_img[current_count] = img[:, start_h:end_h, start_w:end_w]
-            record_den[:, 0] -= start_w
-            record_den[:, 1] -= start_h
-            result_den.append(record_den)
-            result_lab.append(record_lab)
-            current_count += 1
+        # if len(record_den) > 0:
+        #     # copy the cropped rect
+        #     result_img[current_count] = img[:, start_h:end_h, start_w:end_w]
+        #     record_den[:, 0] -= start_w
+        #     record_den[:, 1] -= start_h
+        #     result_den.append(record_den)
+        #     result_lab.append(record_lab)
+        #     current_count += 1
 
     return result_img, result_den, result_lab
 
