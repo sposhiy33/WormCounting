@@ -1,0 +1,33 @@
+experiment_config:
+  multiclass:
+    - embryo
+  gpu_id: 0
+  
+model:
+  backbone: vgg16_bn
+  architecture: mlp
+  row: 1
+  line: 1
+
+training:
+  lr: 0.001
+  lr_backbone: 0.00001
+  epochs: 200
+  batch_size: 3
+  num_patches: 4
+  patch_size: 512
+  scale: true
+  sharpness: true
+  equalize: true
+
+loss_params:
+  loss:
+    - labels
+    - points
+  ce_coef:
+    - 1.0
+  point_loss_coef: 0.0002
+  aux_loss_coef: 0.2
+
+evaluation:
+  eval_freq: 1

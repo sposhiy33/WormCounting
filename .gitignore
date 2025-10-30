@@ -11,3 +11,8 @@ eval_viz/
 dataroot
 results
 *.db
+*.swp
+*.swo
+*.swn
+*.log
+.ipynb_checkpoints/
