@@ -25,7 +25,6 @@ class Linear(nn.Module):
     def __init__(self, in_feat, out_feat):
         super(Linear, self).__init__()
 
-
         self.lin = nn.Sequential(
             nn.Linear(in_feat, 512),
             nn.ReLU(),
@@ -174,6 +173,10 @@ def build_mlp(args, training):
         map_res=args.map_res,
         gauss_kernel_res=args.gauss_kernel_res,
         losses=losses,
+        debris_class_idx=args.debris_class_idx,
+        debris_radius=args.debris_radius,
+        neg_lambda_debris=args.neg_lambda_debris,
+        neg_lambda_other=args.neg_lambda_other,
     )
 
     return model, criterion 

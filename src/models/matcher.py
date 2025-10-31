@@ -20,7 +20,8 @@ class HungarianMatcher_Crowd(nn.Module):
         cost_class: float = 1,
         cost_point: float = 1,
         override_multiclass: bool = False,
-        pointmatch: bool = False
+        pointmatch: bool = False,
+        ignore_class_indices: list | None = None,
     ):
         """Creates the matcher
 
@@ -34,6 +35,7 @@ class HungarianMatcher_Crowd(nn.Module):
         assert cost_class != 0 or cost_point != 0, "all costs cant be 0"
         self.override_multiclass = override_multiclass
         self.pointmatch = pointmatch
+        self.ignore_class_indices = ignore_class_indices
 
     @torch.no_grad()
     def forward(self, outputs, targets):
@@ -68,11 +70,23 @@ class HungarianMatcher_Crowd(nn.Module):
         # Also concat the target labels and points
         # tgt_ids = torch.cat([v["labels"] for v in targets])
 
-        tgt_ids = torch.cat([v["labels"] for v in targets])
-        tgt_points = torch.cat([v["point"] for v in targets])
-
+        tgt_ids_all = torch.cat([v["labels"] for v in targets])
+        tgt_points_all = torch.cat([v["point"] for v in targets])
+        
+        # ignore class indicies if proivided, these will be processed later
+        if self.ignore_class_indices:
+            keep = torch.ones_like(tgt_ids_all, dtype=torch.bool)
+            for cls_idx in self.ignore_class_indices:
+                keep &= (tgt_ids_all != cls_idx)
+            tgt_ids = tgt_ids_all[keep]
+            tgt_points = tgt_points_all[keep]
+        else:
+            tgt_ids = tgt_ids_all
+            tgt_points = tgt_points_all
+        
         if self.override_multiclass:
             tgt_ids = torch.ones(tgt_ids.size()[0], dtype=torch.int)
+
         # Compute the classification cost. Contrary to the loss, we don't use the NLL,
         # but approximate it in 1 - proba[target class].
         # The 1 is a constant that doesn't change the matching, it can be ommitted.
@@ -89,8 +103,17 @@ class HungarianMatcher_Crowd(nn.Module):
         
         # Reshape to back to [batch_size, num_queries, num_target_points]
         C = C.view(bs, num_queries, -1).cpu()
+
         # compute the matching
-        sizes = [len(v["point"]) for v in targets]
+
+        # parition the cost matrix back into local patches
+        sizes = []
+        for target in targets:
+            keep = torch.ones_like(target["labels"], dtype=torch.bool)
+            for cls_idx in self.ignore_class_indices:
+                keep &= (target["labels"] != cls_idx)
+            sizes.append(torch.sum(keep).item())
+        
         indices = [
             linear_sum_assignment(c[i]) for i, c in enumerate(C.split(sizes, -1))
         ]
@@ -110,4 +133,5 @@ def build_matcher_crowd(args, override_multiclass: bool = False):
         cost_point=args.set_cost_point,
         override_multiclass=override_multiclass,
         pointmatch=args.pointmatch,
+        ignore_class_indices=[args.debris_class_idx] if args.debris_class_idx is not None else None,
     )

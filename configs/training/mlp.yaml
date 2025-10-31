@@ -27,9 +27,12 @@ loss_params:
     - points
   ce_coef:
     - 1.0
-    - 1.0
   point_loss_coef: 0.0002
   aux_loss_coef: 0.2
+  debris_class_idx: 2
+  debris_radius: 5
+  neg_lambda_debris: 100
+  neg_lambda_other: 1
 
 evaluation:
   eval_freq: 1

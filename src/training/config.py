@@ -165,6 +165,32 @@ def get_args_parser():
         help="kernel size for generating heatmaps",
     )
 
+    # --- debris loss parameters ---
+    parser.add_argument(
+        "--debris_class_idx",
+        default=None,
+        type=int,
+        help="class index of the debris class",
+    )
+    parser.add_argument(
+        "--debris_radius",
+        default=5,
+        type=float,
+        help="radius of the debris class",
+    )
+    parser.add_argument(
+        "--neg_lambda_debris",
+        default=1,
+        type=float,
+        help="weight of the debris class",
+    )
+    parser.add_argument(
+        "--neg_lambda_other",
+        default=1,
+        type=float,
+        help="weight of the general backgroud class",
+    )
+
     parser.add_argument(
         "--row", default=3, type=int, help="row number of anchor points"
     )
@@ -291,6 +317,11 @@ def get_args():
 
     # internal validation
     args.num_classes = len(args.multiclass)
+    args.debris_class_idx = args.multiclass.index("debris") + 1 if "debris" in args.multiclass else None
+    
+    # if debris is a class, make sure it is a not an output class in the logit
+    if args.debris_class_idx is not None:
+        args.num_classes -= 1
     
     return args
 
