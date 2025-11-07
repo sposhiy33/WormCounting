@@ -17,3 +17,5 @@ results
 *.log
 .ipynb_checkpoints/
 .aim/
+data/
+outputs/
