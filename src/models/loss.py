@@ -1,3 +1,6 @@
+from typing import Any
+
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -28,7 +31,8 @@ class SetCriterion_Crowd(nn.Module):
 
     def __init__(self, num_classes, 
                     matcher, weight_dict, eos_coef, ce_coef, map_res, gauss_kernel_res, 
-                    losses, debris_class_idx=None, debris_radius=None, neg_lambda_debris=None, neg_lambda_other=None):
+                    losses, debris_class_idx=None, debris_radius=None, neg_lambda_debris=None, neg_lambda_other=None,
+                    normalized_ce=False):
         """Create the criterion.
         Parameters:
             num_classes: number of object categories, omitting the special no-object category
@@ -41,6 +45,7 @@ class SetCriterion_Crowd(nn.Module):
             debris_radius: radius of the debris class. If None, no debris class is used.
             neg_lambda_debris: weight of the debris class. If None, no debris class is used.
             neg_lambda_other: weight of the other class. If None, no other class is used.
+            normalized_ce: normalize the ce weights to sum to 1.
         """
         
         super().__init__()
@@ -53,7 +58,8 @@ class SetCriterion_Crowd(nn.Module):
         self.eos_coef = eos_coef
         self.ce_coef = ce_coef
         self.map_res = map_res
-
+        self.normalized_ce = normalized_ce
+        
         # --- initialize cross entropy focal loss weights ---
         ce_weight = torch.ones(self.num_classes + 1)
         ce_weight[0] = self.eos_coef
@@ -84,10 +90,13 @@ class SetCriterion_Crowd(nn.Module):
         self.neg_lambda_debris = neg_lambda_debris
         self.neg_lambda_other = neg_lambda_other
 
+    # TODO: clear up this code, it makes no sense
     def loss_labels(self, outputs, targets, indices, num_points, samples):
-        """Classification loss (NLL)
+        """
+        Classification loss (NLL)
         targets dicts must contain the key "labels" containing a tensor of dim [nb_target_boxes]
         """
+        
         assert "pred_logits" in outputs and "pred_points" in outputs
         
         src_logits = outputs["pred_logits"] # --> [B,Q,C]
@@ -100,11 +109,12 @@ class SetCriterion_Crowd(nn.Module):
             [t["labels"][J] for t, (_, J) in zip(targets, indices)]
         )
         target_classes = torch.full(
-            src_logits.shape[:2], 0, dtype=torch.int64, device=src_logits.device
+               src_logits.shape[:2], 0, dtype=torch.int64, device=src_logits.device
         )
         target_classes[idx] = target_classes_o
         
         # --- calcualte CE loss for each anchor points ---
+        
         per_ce = F.cross_entropy(src_logits.transpose(1, 2), target_classes, reduction="none")
         
         pos_mask = target_classes > 0
@@ -113,6 +123,7 @@ class SetCriterion_Crowd(nn.Module):
         # --- identify debris-negative anchors by proximity to debris GT points ---
         
         debris_mask = torch.zeros_like(neg_mask, dtype=torch.bool)
+
         if self.debris_class_idx is not None:
             radius2 = self.debris_radius * self.debris_radius
             B, Q, _ = anchor_points.shape
@@ -132,22 +143,37 @@ class SetCriterion_Crowd(nn.Module):
                         debris_mask[b] = (min_dist2 <= radius2)
 
             other_neg_mask = neg_mask & ~debris_mask
+        else:
+            other_neg_mask = neg_mask
 
-
-        # Safe means per group
+        # Safe means per group --> returns near zero value if no samples in inputs list, prevents division by zero
         def safe_mean(x): 
             return x.sum() / (x.numel() + 1e-9)
+
+        # --- calculate mean loss term for each class ---
 
         loss_pos = safe_mean(per_ce[pos_mask]) if pos_mask.any() else per_ce.new_tensor(0.0)
         loss_neg_other = safe_mean(per_ce[other_neg_mask]) if other_neg_mask.any() else per_ce.new_tensor(0.0)
 
         if self.debris_class_idx is not None:
             loss_neg_debris = safe_mean(per_ce[debris_mask]) if debris_mask.any() else per_ce.new_tensor(0.0)
-            loss_ce = loss_pos + self.neg_lambda_debris * loss_neg_debris + self.neg_lambda_other * loss_neg_other
         else:
-            loss_ce = loss_pos + self.neg_lambda_other * loss_neg_other
+            loss_neg_debris = per_ce.new_tensor(0.0)
+
+        # --- calculate loss, 
+        if self.debris_class_idx is not None:
+            if self.normalized_ce:
+                loss_ce = loss_pos + loss_neg_debris + loss_neg_other
+            else:
+                loss_ce = self.pos_ce_weight * loss_pos + self.neg_lambda_debris * loss_neg_debris + self.neg_lambda_other * loss_neg_other
+        else:
+            if self.normalized_ce:
+                loss_ce = loss_pos + loss_neg_other
+            else:
+                loss_ce = self.pos_ce_weight * loss_pos + self.neg_lambda_other * loss_neg_other
 
         # --- calculate classwise loss --> useful for debugging and hyperparameter tuning ---
+        
         classwise_loss_ce = []
         for i in range(self.num_classes + 1):
             weight = torch.zeros(self.num_classes + 1, device=src_logits.device)

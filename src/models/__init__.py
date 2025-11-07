@@ -1,6 +1,6 @@
 from .p2pnet import build_p2p
 from .classification import build_classifier
-from .mlp import build_mlp
+from .mlp import build_mlp, build_mlp_two_stage
 from .gat import build_gat_classifier
 
 # build the P2PNet model
@@ -10,6 +10,8 @@ def build_model(args, training=False):
         return build_classifier(args, training)
     elif args.architecture in ["mlp", "mlp_classifier"]:
         return build_mlp(args, training)
+    elif args.architecture == "mlp_two_stage":
+        return build_mlp_two_stage(args, training)
     elif args.architecture == "gat":
         return build_gat_classifier(args, training) 
     else:

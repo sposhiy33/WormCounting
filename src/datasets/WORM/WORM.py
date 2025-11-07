@@ -32,6 +32,7 @@ class WORM(Dataset):
         sharpness=False,
         equalize=False,
         salt_and_pepper=False,
+        median_filter=False,
     ):
         self.root_path = data_root
 
@@ -88,6 +89,10 @@ class WORM(Dataset):
         self.sharpness = sharpness
         self.equalize = equalize
         self.salt_and_pepper = salt_and_pepper
+        self.median_filter = median_filter
+
+        if self.median_filter:
+            print("Applying median filter")
 
     def __len__(self):
         return self.nSamples
@@ -102,12 +107,16 @@ class WORM(Dataset):
             (img_path, gt_path), self.train, self.multiclass,
         )
 
+        if (self.train == False) and (self.median_filter == True):
+            img_array = np.array(img)
+            img_array = cv2.medianBlur(img_array, 13)
+            img = Image.fromarray(img_array)
+
         if self.edges:
             img = edges(img)  
 
         if self.equalize:
             img = F.equalize(img)
-
 
         if self.train and self.sharpness:
             # apply sharpness augmentation

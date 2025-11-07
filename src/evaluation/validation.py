@@ -90,6 +90,7 @@ def main(args):
                 equalize=args.equalize,
                 num_patch=args.num_patches,
                 patch_size=args.patch_size,
+                median_filter=args.median_filter,
             )
             # create the sampler used during training
             sampler_val = torch.utils.data.SequentialSampler(val_set)
@@ -168,6 +169,7 @@ def main(args):
             equalize=args.equalize,
             num_patch=args.num_patches,
             patch_size=args.patch_size,
+            median_filter=args.median_filter,
         )
         # create the sampler used during training
         sampler_val = torch.utils.data.SequentialSampler(val_set)

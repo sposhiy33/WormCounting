@@ -19,6 +19,7 @@ def loading_data(
     patch=False,
     equalize=False,
     salt_and_pepper=False,
+    median_filter=False,
 ):
     
     # the pre-proccssing transform
@@ -65,6 +66,7 @@ def loading_data(
         edges=edges,
         sharpness=sharpness,
         equalize=equalize,
+        median_filter=median_filter,
     )
     return train_set, val_set
 

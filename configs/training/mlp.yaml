@@ -6,7 +6,8 @@ experiment_config:
   
 model:
   backbone: vgg16_bn
-  architecture: mlp
+  architecture: mlp_two_stage
+  stage_one_model_path: outputs/results/debris_normalizedce_oneall/weights/best_f1.pth
   row: 1
   line: 1
 
@@ -17,9 +18,9 @@ training:
   batch_size: 3
   num_patches: 4
   patch_size: 512
-  scale: true
+  scale: false
   sharpness: true
-  equalize: true
+  equalize: false
 
 loss_params:
   loss:
@@ -31,8 +32,9 @@ loss_params:
   aux_loss_coef: 0.2
   debris_class_idx: 2
   debris_radius: 5
-  neg_lambda_debris: 100
-  neg_lambda_other: 1
+  neg_lambda_debris: 1.0
+  neg_lambda_other: 10.0 
+  normalized_ce: true
 
 evaluation:
   eval_freq: 1

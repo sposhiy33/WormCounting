@@ -153,6 +153,12 @@ def get_args_parser():
     )
 
     parser.add_argument(
+        "--normalized_ce",
+        action="store_true",
+        help="normalize each loss term by number of samples in each class"
+    )
+
+    parser.add_argument(
         "--map_res",
         default=4,
         type=int,
@@ -166,6 +172,7 @@ def get_args_parser():
     )
 
     # --- debris loss parameters ---
+
     parser.add_argument(
         "--debris_class_idx",
         default=None,
@@ -178,6 +185,7 @@ def get_args_parser():
         type=float,
         help="radius of the debris class",
     )
+
     parser.add_argument(
         "--neg_lambda_debris",
         default=1,
@@ -285,7 +293,7 @@ def get_args_parser():
         "--architecture",
         type=str,
         help="option to build a model with specific architecture",
-        choices=["p2p", "classifier", "mlp", "mlp_classifier", "gat"],
+        choices=["p2p", "classifier", "mlp", "mlp_classifier", "mlp_two_stage", "gat"],
         default="p2p",
     )
 
@@ -302,6 +310,12 @@ def get_args_parser():
         "--gpu_id", default=0, type=int, help="the gpu used for training"
     )
 
+    parser.add_argument(
+        "--stage_one_model_path",
+        type=str,
+        help="path to the stage one model",
+        default=None,
+    )
     return parser
 
 def get_args():

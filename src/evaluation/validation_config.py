@@ -21,7 +21,7 @@ def get_arg_parser():
     
     parent_parser = get_args_parser()
     
-    parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
+    parser = argparse.ArgumentParser(parents=[parent_parser])
 
     # path parameters
     parser.add_argument("--weight_type", type=str, choices=['best_mae.pth', 
@@ -35,7 +35,7 @@ def get_arg_parser():
     parser.add_argument("--val_set", type=str, help="Name of the validation set to evaluate on")
 
     parser.add_argument("--equal_crop", action="store_true", help="Use equal crop during validation")
-
+    parser.add_argument("--median_filter", action="store_true", help="Use median filter during validation")
     return parser
 
 def get_args():
